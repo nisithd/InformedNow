@@ -1,0 +1,141 @@
+#comments {
+  font-size: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.comment {
+  display: flex;
+  align-items: flex-start;
+  width: 100%;
+  padding: 15px 0;
+  border-bottom: 1px solid #ccc;
+  gap: 15px;
+  flex-wrap: wrap;
+  opacity: 1;
+  transform: translateY(0);
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+.comment.fade-out {
+  opacity: 0;
+  transform: translateY(-10px);
+}
+
+.comment.fade-in {
+  opacity: 0;
+  transform: translateY(10px);
+}
+
+.comment.fade-in.show {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.comment_user {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100px;
+  text-align: center;
+}
+
+.comment_picture {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  overflow: hidden;
+}
+
+.comment_picture img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.comment_username {
+  margin-top: 5px;
+  font-weight: bold;
+  font-size: 14px;
+}
+
+.comment_date {
+  font-size: 12px;
+  color: gray;
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: visible;
+}
+
+.comment_content {
+  flex: 1;
+  font-size: 16px;
+  line-height: 1.4;
+  word-wrap: break-word;
+}
+
+.icon {
+  width: 40px;
+  height: 40px;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: 75%;
+  border: none;
+  background-color: transparent;
+  cursor: pointer;
+  margin-left: auto;
+  transition: transform 0.2s ease;
+}
+
+.icon:hover {
+  transform: scale(1.1);
+}
+
+.delete-icon {
+  background-image: url("../media/delete-icon.png");
+}
+
+.comment-nav {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+#page-number {
+  font-size: 18px;
+  font-weight: bold;
+  color: #3c3d3f;
+  display: flex;
+  align-items: center;
+  padding-top: 6px;
+}
+
+.comment-nav button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    background-color: #cccccc;
+    border-color: #999999;
+}
+
+.comment-nav button:disabled:hover {
+    background-color: #cccccc;
+    transform: none;
+}
+
+.comment-nav button {
+  padding: 8px 14px;
+  border: none;
+  border-radius: 6px;
+  background: #0077ff;
+  color: white;
+  cursor: pointer;
+  font-weight: 500;
+  transition: background 0.2s ease, transform 0.2s ease;
+}
+
+.comment-nav button:hover {
+  background: #005ecc;
+  transform: scale(1.05);
+}

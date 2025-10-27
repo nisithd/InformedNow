@@ -1,0 +1,91 @@
+.complex_form {
+  margin-top: 20px;
+  border-radius: 10px;
+  border: 2px solid #3c3d3f;
+  padding: 20px 15px;
+  display: flex;
+  flex-direction: column;
+  background-color: #fafafa;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+}
+
+.complex_form .form_header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.complex_form .form_title {
+  font-size: 22px;
+  font-weight: bold;
+  margin: 0;
+  padding: 10px 20px;
+  color: #fff;
+  background-color: #3c3d3f;
+  border-radius: 8px 8px 0 0;
+}
+
+.complex_form .form_body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: 1000px;
+  opacity: 1;
+  overflow: hidden;
+  padding: 10px 0;
+  transition: max-height 0.3s ease, opacity 0.3s ease, padding 0.3s ease;
+  box-sizing: border-box;
+}
+
+.complex_form .form_body.minimized {
+  max-height: 0;
+  opacity: 0;
+  padding: 0;
+}
+
+.complex_form .form_element {
+  display: block;
+  width: 100%;
+  padding: 8px 12px;
+  font-size: 18px;
+  border-radius: 8px;
+  border: 1px solid #ccc;
+  box-sizing: border-box;
+  margin-bottom: 10px;
+}
+
+.btn {
+  border-radius: 10px;
+  text-align: center;
+  font-size: 18px;
+  color: #3c3d3f;
+  background: #ffffff;
+  border: 2px solid #3c3d3f;
+  padding: 10px 20px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn:hover {
+  background: #3c3d3f;
+  color: #ffffff;
+  transform: scale(1.03);
+}
+
+.minimize_btn {
+  background: #000;
+  color: #fff;
+  font-size: 18px;
+  border: none;
+  cursor: pointer;
+  align-self: flex-end;
+  padding: 6px 12px;
+  border-radius: 6px;
+  transition: background 0.2s ease, transform 0.2s ease;
+}
+
+.minimize_btn:hover {
+  background: #333;
+  transform: scale(1.05);
+}

@@ -1,0 +1,14 @@
+# OS Files
+database
+.DS_Store
+
+# node.js
+node_modules
+uploads
+db
+certs
+vhost
+vhost.d
+html
+.env
+env

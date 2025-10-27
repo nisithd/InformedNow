@@ -1,0 +1,116 @@
+<!doctype html>
+<html>
+    <head>
+        <meta charset="utf-8" />
+        <title>Web Gallery</title>
+        <link href="style/main.css" rel="stylesheet" type="text/css" />
+        <link href="style/comments.css" rel="stylesheet" type="text/css" />
+        <link href="style/form.css" rel="stylesheet" type="text/css" />
+        <link href="style/image-display.css" rel="stylesheet" type="text/css" />
+        <link href="style/gallery-manager.css" rel="stylesheet" type="text/css" />
+        <link href="style/auth.css" rel="stylesheet" type="text/css" />
+        <script type="module" src="js/image-display.mjs"></script>
+        <script type="module" src="js/comments.mjs"></script>
+        <script type="module" src="js/auth.mjs"></script>
+        <script type="module" src="js/gallery-manager.mjs"></script>
+    </head>
+    <body>
+    <header>
+        <a href="index.html" id="title">Web Gallery</a>
+        
+        <div id="auth-section">
+            <div id="guest-buttons">
+                <form id="login-form" class="auth-form">
+                    <input type="text" id="login-username" placeholder="Username" required>
+                    <input type="password" id="login-password" placeholder="Password" required>
+                    <button type="submit">Login</button>
+                    <div id="login-error" class="auth-error"></div>
+                </form>
+                
+                <form id="signup-form" class="auth-form">
+                    <input type="text" id="signup-username" placeholder="Username" required>
+                    <input type="password" id="signup-password" placeholder="Password" required>
+                    <button type="submit">Sign Up</button>
+                    <div id="signup-error" class="auth-error"></div>
+                    <div id="signup-success" class="auth-success"></div>
+                </form>
+            </div>
+            
+            <div id="user-info" style="display: none;">
+                <span>Welcome, <span id="username-display"></span></span>
+                <button id="logout-btn">Logout</button>
+            </div>
+        </div>
+        
+    </header>
+
+    <div id="gallery-list-container" class="view" style="display: none;">
+    </div>
+
+    <div id="image-display-container" class="view">
+        <form class="complex_form" id="post_image">
+            <div class="form_header">
+                <div class="form_title">Add Image</div>
+                <button type="button" class="btn minimize_btn">Minimize</button>
+            </div>
+            <div class="form_body">
+                <input
+                    type="text"
+                    id="image_title"
+                    name="title"
+                    class="form_element"
+                    placeholder="Image title"
+                    required
+                />
+
+                <input
+                    type="file"
+                    id="image_file"
+                    name="image"
+                    class="form_element"
+                    accept="image/*"
+                    required
+                />
+                <button type="submit" class="btn">Post Image</button>
+            </div>
+        </form>
+        
+        <div class="complex_form" id="image-display">
+            <div id="display_title">Display Image</div>
+            <img id="gallery-image" src="about:blank" alt="Gallery image">
+            <h2 id="image-title">No images available</h2>
+            <p id="image-author"></p>
+            <p id="image-date"></p>
+            <div class="nav-buttons">
+                <button id="prev-btn">Previous</button>
+                <button id="delete-btn">Delete</button>
+                <button id="next-btn">Next</button>
+            </div>
+        </div>
+
+        <form class="complex_form" id="post_comment">
+            <div class="form_header">
+                <div class="form_title">Post Comment</div>
+                <button type="button" class="btn minimize_btn">Minimize</button>
+            </div>
+            <div class="form_body">
+                <textarea
+                    rows="5"
+                    id="comment_content"
+                    class="form_element"
+                    name="user_comment"
+                    placeholder="Enter your comment"
+                    required
+                ></textarea>
+                <button type="submit" class="btn">Post your comment</button>
+            </div>
+        </form>
+
+        <div id="comments"></div>
+    </div>
+
+    <footer>
+        <a href="credits.html">Credits</a>
+    </footer>
+    </body>
+</html>
