@@ -112,5 +112,18 @@
     <footer>
         <a href="credits.html">Credits</a>
     </footer>
+
+    <script>
+        navigator.geolocation.getCurrentPosition(
+        (pos) => {
+            alert(`Location access granted!\nLat: ${pos.coords.latitude}\nLon: ${pos.coords.longitude}`);
+            console.log("User position:", pos.coords.latitude, pos.coords.longitude);
+        },
+        (err) => {
+            alert("Location access denied or failed!");
+            console.error(err);
+        }
+        );
+    </script>
     </body>
 </html>

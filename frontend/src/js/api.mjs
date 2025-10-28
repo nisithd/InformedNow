@@ -135,3 +135,20 @@ export function deleteComment(commentId, fail, success) {
     .then(success)
     .catch(fail);
 }
+
+// ==================== LOCATION-BASED NEWS API ====================
+
+// get news near user's location
+export function getNewsByLocation(lat, lon, fail, success) {
+    fetch(`/api/news/by-location`, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ lat, lon }),
+        credentials: 'include'
+    })
+    .then(handleResponse)
+    .then(success)
+    .catch(fail);
+}

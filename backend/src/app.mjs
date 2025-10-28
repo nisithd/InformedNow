@@ -474,6 +474,12 @@ app.delete("/api/comments/:commentId/", isAuthenticated, isCommentOwner, (req, r
   });
 });
 
+app.post("/api/location", (req, res) => {
+  const { latitude, longitude } = req.body;
+  console.log("Received location:", latitude, longitude);
+  res.json({ message: "Location received successfully!" });
+});
+
 // Welcome endpoint
 app.get('/api/', (req, res) => {
   res.json('Welcome to HW3!');
