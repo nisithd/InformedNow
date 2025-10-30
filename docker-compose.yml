@@ -42,8 +42,8 @@ services:
     networks:
       - proxy
     environment:
-      - VIRTUAL_HOST=localhost
-      - LETSENCRYPT_HOST=localhost
+      - VIRTUAL_HOST=project-informednow.amazingcloud.space
+      - LETSENCRYPT_HOST=project-informednow.amazingcloud.space
 
   backend:
     build: backend
