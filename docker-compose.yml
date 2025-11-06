@@ -76,6 +76,8 @@ services:
      restart: always
      volumes:
        - ./data:/data
+     networks:
+       - proxy
   localgpt:
     image: ollama/ollama:latest
     container_name: localgpt
