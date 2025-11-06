@@ -32,10 +32,6 @@ const mongoURI = process.env.NODE_ENV === "prod" ? 'mongodb://mongo/databaseName
 mongoose.connect(mongoURI).then(()=>console.log('connected to mongoDB'))
   .catch(err => console.error("mongoDB connection failed", err))
 
-
-// Compile model from schema
-const SomeModel = mongoose.model("SomeModel", SomeModelSchema);
-
 // Set up paths based on environment
 const dbPath = process.env.NODE_ENV === 'test' ? './testDb' : './database';
 const uploadDir = path.join(process.cwd(), "uploads");
@@ -68,6 +64,8 @@ const SomeModelSchema = new Schema({
   a_string: String,
   a_date: Date,
 });
+// Compile model from schema
+const SomeModel = mongoose.model("SomeModel", SomeModelSchema);
 
 app.use(express.urlencoded({ extended: false }));
 
