@@ -8,6 +8,7 @@ import fs from "fs";
 import multer from "multer";
 import { genSalt, hash, compare } from "bcrypt";
 import { body, validationResult, matchedData } from 'express-validator';
+import mongoose from "mongoose";
 
 const PORT = 3000;
 const app = express();
@@ -24,6 +25,16 @@ app.use(session({
     secure: process.env.NODE_ENV == "prod",
   }
 }));
+
+
+const mongoURI = process.env.NODE_ENV === "prod" ? 'mongodb://mongo/databaseName':'mongodb://localhost:27017/testdb'
+//default port for mongodb is 27017
+mongoose.connect(mongoURI).then(()=>console.log('connected to mongoDB'))
+  .catch(err => console.error("mongoDB connection failed", err))
+
+
+// Compile model from schema
+const SomeModel = mongoose.model("SomeModel", SomeModelSchema);
 
 // Set up paths based on environment
 const dbPath = process.env.NODE_ENV === 'test' ? './testDb' : './database';
@@ -48,6 +59,14 @@ const comments = new Datastore({
   filename: path.join(dbPath, "comments.db"),
   autoload: true, 
   timestampData: true 
+});
+
+// SAMPLE CODE, REMOVE ONCE A FEATURE OR TWO IS BUILT
+const Schema = mongoose.Schema;
+
+const SomeModelSchema = new Schema({
+  a_string: String,
+  a_date: Date,
 });
 
 app.use(express.urlencoded({ extended: false }));

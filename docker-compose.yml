@@ -70,12 +70,12 @@ services:
       - VIRTUAL_PORT=4000
     networks:
       - proxy
-  # mongo:
-  #   image: mongo
-  #   container_name: mongo
-  #   restart: always
-  #   volumes:
-  #     - ./data:/data
+  mongo:
+     image: mongo
+     container_name: mongo
+     restart: always
+     volumes:
+       - ./data:/data
   localgpt:
     image: ollama/ollama:latest
     container_name: localgpt
