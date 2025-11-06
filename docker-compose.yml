@@ -76,7 +76,16 @@ services:
   #   restart: always
   #   volumes:
   #     - ./data:/data
-
+  localgpt:
+    image: ollama/ollama:latest
+    container_name: localgpt
+    restart: unless-stopped
+    expose:
+      - "11434"
+    volumes:
+      - ./ollama/ollama:/root/.ollama
+    networks:
+      - proxy
 networks:
   proxy:
     driver: bridge

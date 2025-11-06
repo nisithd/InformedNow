@@ -177,6 +177,24 @@ const validateComment = [
   }
 ];
 
+// SAMPLE FOR CALLING LLM API - NOTE: the aw
+app.get("/api/testLLM/", (req, res) => {
+    const response = fetch("http://localgpt:11434/api/generate/", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({model: "llama3.2", prompt: "what is the capital of canada", stream: false})
+        })
+        .then(response =>{
+            return response.json();
+        })
+        .then(data =>{
+            return res.json(data.response);
+        })
+        .catch(err => {
+            return res.status(500).err(err);
+        })
+});
+
 // ==================== AUTHENTICATION ROUTES ====================
 
 // Sign up
