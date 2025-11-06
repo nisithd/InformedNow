@@ -27,7 +27,7 @@ app.use(session({
 }));
 
 
-const mongoURI = process.env.NODE_ENV === "prod" ? 'mongodb://mongo/databaseName':'mongodb://localhost:27017/testdb'
+const mongoURI = process.env.NODE_ENV === "prod" ? 'mongodb://mongo:27017/databaseName':'mongodb://localhost:27017/testdb'
 //default port for mongodb is 27017
 mongoose.connect(mongoURI).then(()=>console.log('connected to mongoDB'))
   .catch(err => console.error("mongoDB connection failed", err))
