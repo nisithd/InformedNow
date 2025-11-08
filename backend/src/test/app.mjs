@@ -1,185 +1,673 @@
-import "./test-setup.mjs";
-import request from "supertest";
-import { server } from "../app.mjs";
-import fs from "fs";
+import 'dotenv/config';
+import { createServer } from "http";
+import express from "express";
+import session from "express-session";
+import Datastore from "@seald-io/nedb";
 import path from "path";
+import fs from "fs";
+import multer from "multer";
+import { genSalt, hash, compare } from "bcrypt";
+import { body, validationResult, matchedData } from 'express-validator';
+import mongoose from "mongoose";
 
-// Set test environment before importing your app
-process.env.NODE_ENV = 'test';
+const PORT = 3000;
+const app = express();
 
-// Cleanup function that runs after ALL tests
-after(function() {
-  server.close();
-  
-  // Delete the entire test database folder
-  const testDbPath = "./testDb";
-  if (fs.existsSync(testDbPath)) {
-    fs.rmSync(testDbPath, { recursive: true, force: true });
-    console.log('Cleaned up test database');
+// Session middleware
+app.set('trust proxy', 1);
+app.use(express.json());
+app.use(session({
+  secret: process.env.SESSION_SECRET,
+  resave: false,
+  saveUninitialized: true,
+  cookie: { 
+    sameSite: true,
+    secure: process.env.NODE_ENV == "prod",
   }
-  
-  // Also clean up any test uploads
-  const uploadsDir = "./public/uploads";
-  if (fs.existsSync(uploadsDir)) {
-    const files = fs.readdirSync(uploadsDir);
-    files.forEach(file => {
-      if (file.includes("test") || file.includes("comment")) {
-        fs.unlinkSync(path.join(uploadsDir, file));
-        console.log('Deleted test file:', file);
+}));
+
+
+const mongoURI = process.env.NODE_ENV === "prod" ? 'mongodb://mongo:27017/databaseName':'mongodb://localhost:27017/testdb'
+//default port for mongodb is 27017
+mongoose.connect(mongoURI).then(()=>console.log('connected to mongoDB'))
+  .catch(err => console.error("mongoDB connection failed", err))
+
+// Set up paths based on environment
+const dbPath = process.env.NODE_ENV === 'test' ? './testDb' : './database';
+const uploadDir = path.join(process.cwd(), "uploads");
+
+// Create database directory if it doesn't exist
+if (!fs.existsSync(dbPath)) fs.mkdirSync(dbPath, { recursive: true });
+
+// Databases
+const users = new Datastore({ 
+  filename: path.join(dbPath, "users.db"),
+  autoload: true 
+});
+
+const images = new Datastore({ 
+  filename: path.join(dbPath, "images.db"),
+  autoload: true, 
+  timestampData: true 
+});
+
+const comments = new Datastore({ 
+  filename: path.join(dbPath, "comments.db"),
+  autoload: true, 
+  timestampData: true 
+});
+
+// SAMPLE CODE, REMOVE ONCE A FEATURE OR TWO IS BUILT
+const Schema = mongoose.Schema;
+
+const SomeModelSchema = new Schema({
+  a_string: String,
+  a_date: Date,
+});
+// Compile model from schema
+const SomeModel = mongoose.model("SomeModel", SomeModelSchema);
+
+// ==================== MONGODB SCHEMAS ====================
+// User Preferences Schema
+const UserPreferencesSchema = new Schema({
+  userId: { 
+    type: String, 
+    required: true, 
+    unique: true,
+    index: true 
+  },
+  categories: [{ 
+    type: String, 
+    trim: true 
+  }],
+  llmContext: {
+    preferenceString: String,
+    categoryCount: Number,
+    prompt: String
+  },
+  createdAt: { 
+    type: Date, 
+    default: Date.now 
+  },
+  updatedAt: { 
+    type: Date, 
+    default: Date.now 
+  }
+});
+
+// Update the updatedAt timestamp before saving
+UserPreferencesSchema.pre('save', function(next) {
+  this.updatedAt = Date.now();
+  next();
+});
+
+// Compile model from schema
+const UserPreferences = mongoose.model("UserPreferences", UserPreferencesSchema);
+
+// Add this validation middleware after validateComment (around line 188)
+const validatePreferences = [
+  body('categories')
+    .isArray()
+    .withMessage('Categories must be an array'),
+  body('categories.*')
+    .trim()
+    .isLength({ min: 1, max: 50 })
+    .withMessage('Each category must be between 1-50 characters')
+    .escape(),
+  (req, res, next) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
+    next();
+  }
+];
+
+app.use(express.urlencoded({ extended: false }));
+
+// development: use express to serve frontend files
+// production: use a dockerized nginx to serve frontend files
+if (process.env.NODE_ENV=="dev") {
+  app.use(express.static('../../frontend/src'));
+} else {
+  app.use(express.static("static"));
+}
+
+// Create uploads directory if it doesn't exist
+if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
+// app.use("/api/uploads", express.static(uploadDir));
+
+app.use((req, res, next) => {
+  console.log("HTTP request", req.method, req.url, req.body || req.query);
+  next();
+});
+
+// Multer configuration for file uploads
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, uploadDir),
+  filename: (req, file, cb) => {
+    const safe = file.originalname.replace(/\s+/g, "_");
+    const ext = path.extname(safe);
+    cb(null, `image-${Date.now()}${ext}`);
+  }
+});
+
+const upload = multer({
+  storage,
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = /jpeg|jpg|png|gif/;
+    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+    const mimetype = allowedTypes.test(file.mimetype);
+    
+    if (mimetype && extname) {
+      return cb(null, true);
+    } else {
+      cb(new Error('Only image files are allowed'));
+    }
+  },
+  limits: { fileSize: 5 * 1024 * 1024 }
+});
+
+// ==================== MIDDLEWARE ====================
+
+// Authentication middleware
+const isAuthenticated = function (req, res, next) {
+  if (!req.session.username) return res.status(401).end("access denied");
+  next();
+};
+
+// Gallery ownership middleware
+const isGalleryOwner = function (req, res, next) {
+  const targetUserId = req.params.userId;
+  if (req.session.username !== targetUserId) {
+    return res.status(403).end("forbidden - not gallery owner");
+  }
+  next();
+};
+
+// Comment ownership middleware
+const isCommentOwner = function (req, res, next) {
+  const commentId = req.params.commentId || req.params.id;
+  comments.findOne({ _id: commentId }, (err, comment) => {
+    if (err) return res.status(500).end("DB error finding comment");
+    if (!comment) return res.status(404).end("comment not found");
+    
+    // Find the image this comment belongs to
+    images.findOne({ _id: comment.imageId }, (imgErr, image) => {
+      if (imgErr) return res.status(500).end("DB error finding image");
+      
+      // Allow if: comment owner OR gallery owner of the image
+      if (req.session.username === comment.userId || 
+          req.session.username === image.userId) {
+        return next();
       }
+      return res.status(403).end("forbidden");
     });
+  });
+};
+
+// Validation middleware
+const validateAuth = [
+  body('username')
+    .trim()
+    .isLength({ min: 1, max: 50 })
+    .withMessage('Username must be between 1-50 characters')
+    .escape(),
+  body('password')
+    .isLength({ min: 1 })
+    .withMessage('Password is required'),
+  (req, res, next) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
+    next();
+  }
+];
+
+const validateImage = [
+  body('title')
+    .trim()
+    .isLength({ min: 1, max: 100 })
+    .withMessage('Title must be between 1-100 characters')
+    .escape(),
+  // Removed author validation - it will be auto-filled from session
+  (req, res, next) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
+    next();
+  }
+];
+
+const validateComment = [
+  body('content')
+    .trim()
+    .isLength({ min: 1, max: 500 })
+    .withMessage('Comment must be between 1-500 characters')
+    .escape(),
+  (req, res, next) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
+    next();
+  }
+];
+
+// SAMPLE FOR CALLING LLM API - NOTE: the aw
+app.get("/api/testLLM/", (req, res) => {
+    const response = fetch("http://localgpt:11434/api/generate/", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({model: "llama3.2", prompt: "what is the capital of canada", stream: false})
+        })
+        .then(response =>{
+            return response.json();
+        })
+        .then(data =>{
+            return res.json(data.response);
+        })
+        .catch(err => {
+            return res.status(500).err(err);
+        })
+});
+
+// ==================== USER PREFERENCES (WITHOUT AUTH) ====================
+// Get user preferences (no auth - uses temporary userId)
+app.get("/api/preferences/temp/", async (req, res) => {
+  try {
+    // Use a temporary test user ID
+    const tempUserId = "temp-user-001";
+    
+    let preferences = await UserPreferences.findOne({ userId: tempUserId });
+    
+    // Return preferences or default empty structure
+    if (!preferences) {
+      return res.json({
+        userId: tempUserId,
+        categories: [],
+        createdAt: null,
+        updatedAt: null,
+        llmContext: {
+          preferenceString: '',
+          categoryCount: 0,
+          prompt: 'User interests: None selected'
+        }
+      });
+    }
+    
+    return res.json(preferences);
+  } catch (error) {
+    console.error("Error fetching preferences:", error);
+    return res.status(500).end("DB error finding preferences");
   }
 });
 
-describe("Testing Static Files", () => {
-  it("should serve index.html", function (done) {
-    request(server)
-      .get("/")
-      .expect(200)
-      .expect(/Web Gallery/)
-      .end(done);
+// Save/update user preferences (no auth - uses temporary userId)
+app.post("/api/preferences/temp/", validatePreferences, async (req, res) => {
+  try {
+    // Use a temporary test user ID
+    const tempUserId = "temp-user-001";
+    const data = matchedData(req);
+    const categories = data.categories || [];
+    
+    // Build LLM context for future AI features
+    const llmContext = {
+      preferenceString: categories.join(', '),
+      categoryCount: categories.length,
+      prompt: `User interests: ${categories.length > 0 ? categories.join(', ') : 'None selected'}`
+    };
+    
+    // Find existing preferences or create new
+    let preferences = await UserPreferences.findOne({ userId: tempUserId });
+    
+    if (preferences) {
+      // Update existing preferences
+      preferences.categories = categories;
+      preferences.llmContext = llmContext;
+      preferences.updatedAt = new Date();
+      
+      await preferences.save();
+      return res.json(preferences);
+    } else {
+      // Create new preferences
+      preferences = new UserPreferences({
+        userId: tempUserId,
+        categories: categories,
+        llmContext: llmContext
+      });
+      
+      await preferences.save();
+      return res.status(201).json(preferences);
+    }
+  } catch (error) {
+    console.error("Error saving preferences:", error);
+    return res.status(500).end("DB error saving preferences");
+  }
+});
+
+// Delete user preferences (no auth - for testing)
+app.delete("/api/preferences/temp/", async (req, res) => {
+  try {
+    const tempUserId = "temp-user-001";
+    
+    const result = await UserPreferences.deleteOne({ userId: tempUserId });
+    
+    if (result.deletedCount === 0) {
+      return res.status(404).end("No preferences found");
+    }
+    
+    return res.json({ message: "Preferences deleted successfully" });
+  } catch (error) {
+    console.error("Error deleting preferences:", error);
+    return res.status(500).end("DB error deleting preferences");
+  }
+});
+
+// ==================== AUTHENTICATION ROUTES ====================
+
+// Sign up
+app.put("/api/signup/", validateAuth, (req, res) => {
+  const data = matchedData(req);
+  const username = data.username;
+  const password = data.password;
+  
+  users.findOne({ _id: username }, (err, user) => {
+    if (err) return res.status(500).end("DB error");
+    if (user) return res.status(409).end("username " + username + " already exists");
+    
+    genSalt(10, (err, salt) => {
+      hash(password, salt, (err, hash) => {
+        users.update(
+          { _id: username },
+          { _id: username, hash: hash },
+          { upsert: true },
+          (err) => {
+            if (err) return res.status(500).end("DB error");
+            return res.json(username);
+          }
+        );
+      });
+    });
   });
 });
 
-describe("Testing Images API", () => {
-  let testImageId;
-
-  it("should get all images (empty initially)", function (done) {
-    request(server)
-      .get("/api/images/")
-      .expect(200)
-      .expect('Content-Type', /json/)
-      .expect(res => {
-        if (!Array.isArray(res.body)) throw new Error('Response is not an array');
-      })
-      .end(done);
-  });
-
-  it("should create a new image", function (done) {
-    request(server)
-      .post("/api/images/")
-      .field("title", "Test Image")
-      .field("author", "Test Author")
-      .attach("image", Buffer.from("fake image data"), "test.jpg")
-      .expect(201)
-      .expect('Content-Type', /json/)
-      .expect(res => {
-        if (!res.body._id) throw new Error('Missing image ID');
-        testImageId = res.body._id;
-      })
-      .end(done);
-  });
-
-  it("should get the created image by ID", function (done) {
-    request(server)
-      .get(`/api/images/${testImageId}`)
-      .expect(200)
-      .expect('Content-Type', /json/)
-      .expect(res => {
-        if (res.body._id !== testImageId) throw new Error('Wrong image returned');
-      })
-      .end(done);
-  });
-
-  it("should delete an image", function (done) {
-    request(server)
-      .delete(`/api/images/${testImageId}`)
-      .expect(200)
-      .expect('Content-Type', /json/)
-      .end(done);
+// Sign in
+app.post("/api/signin/", validateAuth, (req, res) => {
+  const data = matchedData(req);
+  const username = data.username;
+  const password = data.password;
+  
+  users.findOne({ _id: username }, (err, user) => {
+    if (err) return res.status(500).end("DB error");
+    if (!user) return res.status(401).end("access denied");
+    
+    compare(password, user.hash, (err, valid) => {
+      if (err) return res.status(500).end("error");
+      if (!valid) return res.status(401).end("access denied");
+      
+      req.session.username = username;
+      return res.json(username);
+    });
   });
 });
 
-describe("Testing Comments API", () => {
-  let testImageId;
-  let testCommentId;
+// Sign out
+app.get("/api/signout/", (req, res) => {
+  req.session.destroy();
+  return res.json("signed out");
+});
 
-  before(function (done) {
-    request(server)
-      .post("/api/images/")
-      .field("title", "Comment Test Image")
-      .field("author", "Comment Test Author")
-      .attach("image", Buffer.from("fake image data"), "comment_test.jpg")
-      .end(function (err, res) {
-        testImageId = res.body._id;
-        done();
+// Get current user
+app.get("/api/user/", (req, res) => {
+  if (!req.session.username) return res.json(null);
+  return res.json(req.session.username);
+});
+
+// ==================== GALLERY LIST ROUTES ====================
+
+// GET /api/galleries/ - Get paginated list of users with gallery stats
+app.get("/api/galleries/", isAuthenticated, (req, res) => {
+    const page = parseInt(req.query.page) || 0;
+    const pageSize = 10;
+    
+    // Get distinct users who have images
+    images.find({}, (err, allImages) => {
+        if (err) return res.status(500).end("DB error getting images");
+        
+        // Get unique user IDs from images
+        const userSet = new Set();
+        allImages.forEach(image => {
+            if (image.userId) {
+                userSet.add(image.userId);
+            }
+        });
+        
+        const uniqueUsers = Array.from(userSet);
+        
+        // Count images for each user
+        const galleryPromises = uniqueUsers.map(userId => {
+            return new Promise((resolve) => {
+                images.count({ userId: userId }, (countErr, imageCount) => {
+                    if (countErr) {
+                        resolve({ username: userId, imageCount: 0 });
+                    } else {
+                        resolve({ username: userId, imageCount: imageCount });
+                    }
+                });
+            });
+        });
+        
+        Promise.all(galleryPromises).then(galleries => {
+            // Sort by username
+            galleries.sort((a, b) => a.username.localeCompare(b.username));
+            
+            // Paginate
+            const start = page * pageSize;
+            const end = start + pageSize;
+            const paginatedGalleries = galleries.slice(start, end);
+            const totalPages = Math.ceil(galleries.length / pageSize);
+            
+            res.json({
+                galleries: paginatedGalleries,
+                page: page,
+                totalPages: totalPages,
+                totalGalleries: galleries.length
+            });
+        });
+    });
+});
+
+// ==================== USER GALLERY ROUTES ====================
+
+// Get image by position in user's gallery
+app.get("/api/users/:userId/images/current/:position", isAuthenticated, (req, res) => {
+  const userId = req.params.userId;
+  const position = parseInt(req.params.position) || 0;
+  
+  images
+    .find({ userId: userId })
+    .sort({ createdAt: -1 })
+    .skip(position)
+    .limit(1)
+    .exec((err, docs) => {
+      if (err) return res.status(500).end("DB error finding image");
+      
+      images.count({ userId: userId }, (countErr, total) => {
+        if (countErr) return res.status(500).end("DB error counting images");
+        
+        if (docs.length === 0) {
+          return res.json({
+            image: null,
+            position: position,
+            total: total,
+            hasNext: false,
+            hasPrev: false
+          });
+        }
+        
+        res.json({
+          image: docs[0],
+          position: position,
+          total: total,
+          hasNext: position < total - 1,
+          hasPrev: position > 0
+        });
       });
-  });
+    });
+});
 
-  it("should add a comment to an image", function (done) {
-    request(server)
-      .post(`/api/images/${testImageId}/comments/`)
-      .send({
-        author: "Test Commenter",
-        content: "This is a test comment"
-      })
-      .expect(201)
-      .expect('Content-Type', /json/)
-      .expect(res => {
-        testCommentId = res.body._id;
-      })
-      .end(done);
-  });
-
-  it("should delete a comment", function (done) {
-    request(server)
-      .delete(`/api/comments/${testCommentId}`)
-      .expect(200)
-      .end(done);
-  });
-
-  it("should delete the comment test image", function (done) {
-    request(server)
-      .delete(`/api/images/${testImageId}`)
-      .expect(200)
-      .end(done);
+// Get user's image count
+app.get("/api/users/:userId/images/count", isAuthenticated, (req, res) => {
+  const userId = req.params.userId;
+  
+  images.count({ userId: userId }, (err, total) => {
+    if (err) return res.status(500).end("DB error counting images");
+    res.json({ total });
   });
 });
 
-describe("Testing Error Cases", () => {
-  let errorTestImageId;
+// Get user's gallery images
+app.get("/api/users/:userId/images/", isAuthenticated, (req, res) => {
+  const userId = req.params.userId;
+  
+  images
+    .find({ userId: userId })
+    .sort({ createdAt: -1 })
+    .exec((err, docs) => {
+      if (err) return res.status(500).end("DB error listing images");
+      res.json(docs);
+    });
+});
 
-  before(function (done) {
-    request(server)
-      .post("/api/images/")
-      .field("title", "Error Test Image")
-      .field("author", "Error Test Author")
-      .attach("image", Buffer.from("fake image data"), "error_test.jpg")
-      .end(function (err, res) {
-        errorTestImageId = res.body._id;
-        done();
+// Upload image to user's gallery
+app.post("/api/users/:userId/images/", isAuthenticated, isGalleryOwner, upload.single("image"), validateImage, (req, res) => {
+  const userId = req.params.userId;
+  const data = matchedData(req);
+  const title = data.title;
+  const author = req.session.username;
+
+  if (!req.file) {
+    return res.status(400).end("You must upload a file (field 'image').");
+  }
+
+  const filename = req.file.filename;
+  
+  const doc = { 
+    title, 
+    author,
+    filename,
+    userId: userId
+  };
+
+  images.insert(doc, (err, newDoc) => {
+    if (err) return res.status(500).end("DB error inserting image");
+    return res.status(201).json(newDoc);
+  });
+});
+
+// Delete image from user's gallery
+app.delete("/api/users/:userId/images/:imageId", isAuthenticated, isGalleryOwner, (req, res) => {
+  const imageId = req.params.imageId;
+  
+  images.findOne({ _id: imageId, userId: req.params.userId }, (err, doc) => {
+    if (err) return res.status(500).end("DB error finding image");
+    if (!doc) return res.status(404).end("Image not found");
+
+    // Delete the uploaded file
+    if (doc.filename) {
+      const filePath = path.join(uploadDir, doc.filename);
+      fs.unlink(filePath, (fsErr) => {
+        if (fsErr && fsErr.code !== "ENOENT") console.warn("Error deleting file:", fsErr);
+      });
+    }
+
+    // Remove image doc
+    images.remove({ _id: imageId }, { multi: false }, (removeErr) => {
+      if (removeErr) return res.status(500).end("DB error deleting image");
+
+      // Remove associated comments
+      comments.remove({ imageId: imageId }, { multi: true }, (cErr) => {
+        if (cErr) console.warn("Error deleting comments for image:", cErr);
+        return res.json({ deleted: imageId });
+      });
+    });
+  });
+});
+
+// ==================== COMMENT ROUTES ====================
+
+// Add comment to any image
+app.post("/api/images/:imageId/comments/", isAuthenticated, validateComment, (req, res) => {
+  const imageId = req.params.imageId;
+  const data = matchedData(req);
+  const content = data.content;
+
+  images.findOne({ _id: imageId }, (err, img) => {
+    if (err) return res.status(500).end("DB error finding image");
+    if (!img) return res.status(404).end("Image not found");
+
+    const doc = { 
+      imageId, 
+      content,
+      userId: req.session.username,
+      author: req.session.username // For display purposes
+    };
+    
+    comments.insert(doc, (cErr, newComment) => {
+      if (cErr) return res.status(500).end("DB error inserting comment");
+      return res.status(201).json(newComment);
+    });
+  });
+});
+
+// Get comments for image (paginated)
+app.get("/api/images/:imageId/comments/", isAuthenticated, (req, res) => {
+  const imageId = req.params.imageId;
+  const page = parseInt(req.query.page) || 0;
+
+  images.findOne({ _id: imageId }, (err, img) => {
+    if (err) return res.status(500).end("DB error finding image");
+    if (!img) return res.status(404).end("Image not found");
+
+    comments
+      .find({ imageId })
+      .sort({ createdAt: -1 })
+      .skip(page * 10)
+      .limit(10)
+      .exec((cErr, docs) => {
+        if (cErr) return res.status(500).end("DB error listing comments");
+        
+        comments.count({ imageId }, (countErr, total) => {
+          if (countErr) return res.status(500).end("DB error counting comments");
+          res.json({
+            comments: docs,
+            page: page,
+            totalPages: Math.max(1, Math.ceil(total / 10)),
+            totalComments: total
+          });
+        });
       });
   });
+});
 
-  it("should return 400 when creating image without file", function (done) {
-    request(server)
-      .post("/api/images/")
-      .field("title", "No File")
-      .field("author", "No File Author")
-      .expect(400)
-      .end(done);
+// Delete comment (owner or gallery owner)
+app.delete("/api/comments/:commentId/", isAuthenticated, isCommentOwner, (req, res) => {
+  const commentId = req.params.commentId;
+  
+  comments.remove({ _id: commentId }, { multi: false }, (err) => {
+    if (err) return res.status(500).end("DB error deleting comment");
+    res.json({ deleted: commentId });
   });
+});
 
-  it("should return 400 when creating comment with missing fields", function (done) {
-    // Test missing author
-    request(server)
-      .post(`/api/images/${errorTestImageId}/comments/`)
-      .send({ content: "No author" })
-      .expect(400)
-      .end(function() {
-        // Test missing content  
-        request(server)
-          .post(`/api/images/${errorTestImageId}/comments/`)
-          .send({ author: "No content" })
-          .expect(400)
-          .end(done);
-      });
-  });
+app.post("/api/location", (req, res) => {
+  const { latitude, longitude } = req.body;
+  console.log("Received location:", latitude, longitude);
+  res.json({ message: "Location received successfully!" });
+});
 
-  it("should delete the error test image", function (done) {
-    request(server)
-      .delete(`/api/images/${errorTestImageId}`)
-      .expect(200)
-      .end(done);
-  });
+// Welcome endpoint
+app.get('/api/', (req, res) => {
+  res.json('Welcome to HW3!');
+});
+
+// start server
+export const server = createServer(app).listen(PORT, (err) => {
+  if (err) console.log(err);
+  else console.log(`HTTP server on http://localhost:${PORT}`);
 });

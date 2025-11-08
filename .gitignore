@@ -12,3 +12,6 @@ vhost.d
 html
 .env
 env
+
+ollama
+.idea

@@ -8,6 +8,17 @@ import fs from "fs";
 import multer from "multer";
 import { genSalt, hash, compare } from "bcrypt";
 import { body, validationResult, matchedData } from 'express-validator';
+import mongoose from "mongoose";
+
+
+import { 
+  getTempPreferences, 
+  saveTempPreferences, 
+  deleteTempPreferences,
+  getAuthPreferences,
+  saveAuthPreferences,
+  deleteAuthPreferences
+} from './UserPreferences.mjs';
 
 const PORT = 3000;
 const app = express();
@@ -24,6 +35,12 @@ app.use(session({
     secure: process.env.NODE_ENV == "prod",
   }
 }));
+
+
+const mongoURI = process.env.NODE_ENV === "prod" ? 'mongodb://mongo:27017/databaseName':'mongodb://localhost:27017/testdb'
+//default port for mongodb is 27017
+mongoose.connect(mongoURI).then(()=>console.log('connected to mongoDB'))
+  .catch(err => console.error("mongoDB connection failed", err))
 
 // Set up paths based on environment
 const dbPath = process.env.NODE_ENV === 'test' ? './testDb' : './database';
@@ -49,6 +66,16 @@ const comments = new Datastore({
   autoload: true, 
   timestampData: true 
 });
+
+// SAMPLE CODE, REMOVE ONCE A FEATURE OR TWO IS BUILT
+const Schema = mongoose.Schema;
+
+const SomeModelSchema = new Schema({
+  a_string: String,
+  a_date: Date,
+});
+// Compile model from schema
+const SomeModel = mongoose.model("SomeModel", SomeModelSchema);
 
 app.use(express.urlencoded({ extended: false }));
 
@@ -254,6 +281,13 @@ app.get("/api/user/", (req, res) => {
   if (!req.session.username) return res.json(null);
   return res.json(req.session.username);
 });
+
+// ==================== USER PREFERENCES ROUTES ====================
+
+// Temporary routes (no authentication needed - for testing)
+app.get("/api/preferences/temp/", getTempPreferences);
+app.post("/api/preferences/temp/", saveTempPreferences);
+app.delete("/api/preferences/temp/", deleteTempPreferences);
 
 // ==================== GALLERY LIST ROUTES ====================
 

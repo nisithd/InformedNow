@@ -26,17 +26,37 @@ const UserPreferences = ({ onComplete }) => {
   const [selectedPreferences, setSelectedPreferences] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Load preferences from localStorage on mount
+  // Load preferences from backend first, then fallback to localStorage ONLY if needed
   useEffect(() => {
-    const savedPreferences = localStorage.getItem('userPreferences');
-    if (savedPreferences) {
-      try {
-        const parsed = JSON.parse(savedPreferences);
-        setSelectedPreferences(parsed.categories || []);
-      } catch (error) {
-        console.error('Error loading preferences:', error);
+    console.log('Fetching preferences from API...');
+
+    fetch('/api/preferences/temp/', {
+      method: 'GET',
+      credentials: 'include'
+    })
+    .then(response => {
+      console.log('📡 API Response status:', response.status);
+      if (!response.ok) throw new Error('Error loading preferences');
+      return response.json();
+    })
+    .then(data => {
+      console.log('Loaded from API:', data);
+      setSelectedPreferences(data.categories || []);
+    })
+    .catch(error => {
+      console.error('API Error:', error);
+      console.log('Using local fallback');
+
+      const savedPreferences = localStorage.getItem('userPreferences');
+      if (savedPreferences) {
+        try {
+          const parsed = JSON.parse(savedPreferences);
+          setSelectedPreferences(parsed.categories || []);
+        } catch (parseError) {
+          console.error('Error parsing local preferences:', parseError);
+        }
       }
-    }
+    });
   }, []);
 
   const togglePreference = (categoryId) => {
@@ -52,50 +72,73 @@ const UserPreferences = ({ onComplete }) => {
   const handleSavePreferences = () => {
     setIsSubmitting(true);
     
-    // Structure ready for MongoDB schema
     const userPreferencesData = {
-      userId: null, // Will be set when auth is implemented
-      categories: selectedPreferences,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      // Ready for future LLM input
-      llmContext: {
-        preferenceString: selectedPreferences.join(', '),
-        categoryCount: selectedPreferences.length,
-        prompt: `User interests: ${selectedPreferences.map(id => 
-          NEWS_CATEGORIES.find(cat => cat.id === id)?.label
-        ).join(', ')}`
-      }
+      categories: selectedPreferences
     };
 
-    // Save to localStorage (temporary until MongoDB is set up)
-    localStorage.setItem('userPreferences', JSON.stringify(userPreferencesData));
-    
-    // Simulate API call
-    setTimeout(() => {
+    fetch('/api/preferences/temp/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify(userPreferencesData)
+    })
+    .then(response => {
+      console.log('📡 Save Response status:', response.status);
+      if (!response.ok) throw new Error('Failed to save preferences');
+      return response.json();
+    })
+    .then(data => {
       setIsSubmitting(false);
-      console.log('Preferences saved:', userPreferencesData);
-      
-      // Call onComplete callback if provided
-      if (onComplete) {
-        onComplete(userPreferencesData);
-      }
-    }, 300);
+      console.log('Saved to backend:', data);
+
+      if (onComplete) onComplete(data);
+    })
+    .catch(error => {
+      console.error('Error saving preferences:', error);
+      setIsSubmitting(false);
+
+      const fallbackData = {
+        userId: null,
+        categories: selectedPreferences,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        offline: true
+      };
+
+      localStorage.setItem('userPreferences', JSON.stringify(fallbackData));
+
+      if (onComplete) onComplete(fallbackData);
+    });
   };
 
   const handleSkip = () => {
-    const emptyPreferences = {
-      userId: null,
-      categories: [],
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      skipped: true
-    };
-    localStorage.setItem('userPreferences', JSON.stringify(emptyPreferences));
-    
-    if (onComplete) {
-      onComplete(emptyPreferences);
-    }
+    const emptyPreferences = { categories: [] };
+
+    fetch('/api/preferences/temp/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify(emptyPreferences)
+    })
+    .then(response => response.json())
+    .then(data => {
+      if (onComplete) onComplete(data);
+    })
+    .catch(error => {
+      console.log('Skipping with local fallback:', error);
+
+      const fallbackData = {
+        userId: null,
+        categories: [],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        skipped: true
+      };
+
+      localStorage.setItem('userPreferences', JSON.stringify(fallbackData));
+
+      if (onComplete) onComplete(fallbackData);
+    });
   };
 
   return (
@@ -113,7 +156,6 @@ const UserPreferences = ({ onComplete }) => {
         padding: '60px 40px',
         boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
       }}>
-        {/* Header */}
         <div style={{ textAlign: 'center', marginBottom: '40px' }}>
           <h1 style={{
             fontSize: '42px',
@@ -130,7 +172,7 @@ const UserPreferences = ({ onComplete }) => {
             lineHeight: '1.6',
             marginBottom: '20px'
           }}>
-            Select topics you'd like to see in your news feed. You can always change these later in settings.
+            Select topics you'd like to see in your news feed.
           </p>
           <div style={{
             fontSize: '16px',
@@ -141,7 +183,6 @@ const UserPreferences = ({ onComplete }) => {
           </div>
         </div>
 
-        {/* Categories Grid */}
         <div style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(2, 1fr)',
@@ -169,16 +210,6 @@ const UserPreferences = ({ onComplete }) => {
                   transition: 'all 0.2s ease',
                   outline: 'none'
                 }}
-                onMouseEnter={(e) => {
-                  if (!isSelected) {
-                    e.currentTarget.style.backgroundColor = '#ebebeb';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!isSelected) {
-                    e.currentTarget.style.backgroundColor = '#f5f5f5';
-                  }
-                }}
               >
                 <span style={{ fontSize: '24px' }}>{category.icon}</span>
                 <span>{category.label}</span>
@@ -187,7 +218,6 @@ const UserPreferences = ({ onComplete }) => {
           })}
         </div>
 
-        {/* Action Buttons */}
         <div style={{
           display: 'flex',
           justifyContent: 'center',
@@ -204,14 +234,12 @@ const UserPreferences = ({ onComplete }) => {
               backgroundColor: 'transparent',
               border: 'none',
               borderRadius: '8px',
-              cursor: 'pointer',
-              transition: 'color 0.2s ease'
+              cursor: 'pointer'
             }}
-            onMouseEnter={(e) => e.currentTarget.style.color = '#1a1a1a'}
-            onMouseLeave={(e) => e.currentTarget.style.color = '#666'}
           >
             Skip for now
           </button>
+
           <button
             onClick={handleSavePreferences}
             disabled={selectedPreferences.length === 0 || isSubmitting}
@@ -224,18 +252,7 @@ const UserPreferences = ({ onComplete }) => {
               border: 'none',
               borderRadius: '8px',
               cursor: selectedPreferences.length === 0 ? 'not-allowed' : 'pointer',
-              transition: 'background-color 0.2s ease',
               opacity: isSubmitting ? 0.7 : 1
-            }}
-            onMouseEnter={(e) => {
-              if (selectedPreferences.length > 0 && !isSubmitting) {
-                e.currentTarget.style.backgroundColor = '#1557b0';
-              }
-            }}
-            onMouseLeave={(e) => {
-              if (selectedPreferences.length > 0) {
-                e.currentTarget.style.backgroundColor = '#1a73e8';
-              }
             }}
           >
             {isSubmitting ? 'Saving...' : 'Continue'}
