@@ -1,19 +1,44 @@
-import Datastore from "@seald-io/nedb";
-import path from "path";
+import mongoose from "mongoose";
 import { body, validationResult, matchedData } from 'express-validator';
 
-// Set up database path
-const dbPath = process.env.NODE_ENV === 'test' ? './testDb' : './database';
+// ==================== MONGODB SCHEMA ====================
 
-// User Preferences Database
-const userPreferences = new Datastore({ 
-  filename: path.join(dbPath, "userPreferences.db"),
-  autoload: true,
-  timestampData: true 
+const UserPreferencesSchema = new mongoose.Schema({
+  userId: { 
+    type: String, 
+    required: true, 
+    unique: true,
+    index: true 
+  },
+  categories: [{ 
+    type: String, 
+    trim: true 
+  }],
+  llmContext: {
+    preferenceString: String,
+    categoryCount: Number,
+    prompt: String
+  },
+  createdAt: {
+    type: Date, 
+    default: Date.now 
+  },
+  updatedAt: { 
+    type: Date, 
+    default: Date.now 
+  }
 });
 
-// ==================== VALIDATION ====================
+// Update the updatedAt timestamp before saving
+UserPreferencesSchema.pre('save', function(next) {
+  this.updatedAt = Date.now();
+  next();
+});
 
+// Compile model from schema
+const UserPreferences = mongoose.model("UserPreferences", UserPreferencesSchema);
+
+// ==================== VALIDATION ====================
 const validatePreferences = [
   body('categories')
     .isArray()
@@ -35,11 +60,11 @@ const validatePreferences = [
 // ==================== TEMPORARY UNAUTHENTICATED ROUTES ====================
 
 // GET temp preferences
-export const getTempPreferences = (req, res) => {
-  const tempUserId = "temp-user-001";
+export const getTempPreferences = async (req, res) => {
+  try {
+    const tempUserId = "temp-user-001";
 
-  userPreferences.findOne({ userId: tempUserId }, (err, prefs) => {
-    if (err) return res.status(500).json({ error: "DB error finding preferences" });
+    let prefs = await UserPreferences.findOne({ userId: tempUserId });
 
     if (!prefs) {
       return res.json({
@@ -56,81 +81,82 @@ export const getTempPreferences = (req, res) => {
     }
 
     return res.json(prefs);
-  });
+  } catch (error) {
+    console.error("Error fetching temp preferences:", error);
+    return res.status(500).json({ error: "DB error finding preferences" });
+  }
 };
 
 // POST temp preferences
 export const saveTempPreferences = [
   validatePreferences,
-  (req, res) => {
-    const tempUserId = "temp-user-001";
-    const data = matchedData(req);
-    const categories = data.categories || [];
+  async (req, res) => {
+    try {
+      const tempUserId = "temp-user-001";
+      const data = matchedData(req);
+      const categories = data.categories || [];
 
-    const llmContext = {
-      preferenceString: categories.join(', '),
-      categoryCount: categories.length,
-      prompt: `User interests: ${categories.length > 0 ? categories.join(', ') : 'None selected'}`
-    };
+      const llmContext = {
+        preferenceString: categories.join(', '),
+        categoryCount: categories.length,
+        prompt: `User interests: ${categories.length > 0 ? categories.join(', ') : 'None selected'}`
+      };
 
-    const preferenceDoc = {
-      userId: tempUserId,
-      categories: categories,
-      updatedAt: new Date().toISOString(),
-      llmContext: llmContext
-    };
+      // Find existing preferences or create new
+      let preferences = await UserPreferences.findOne({ userId: tempUserId });
 
-    userPreferences.findOne({ userId: tempUserId }, (err, existingPrefs) => {
-      if (err) return res.status(500).json({ error: "DB error finding preferences" });
+      if (preferences) {
+        // Update existing preferences
+        preferences.categories = categories;
+        preferences.llmContext = llmContext;
+        preferences.updatedAt = new Date();
 
-      if (existingPrefs) {
-        // Update existing
-        userPreferences.update(
-          { userId: tempUserId },
-          { $set: preferenceDoc },
-          {},
-          (updateErr) => {
-            if (updateErr) return res.status(500).json({ error: "DB error updating preferences" });
-
-            userPreferences.findOne({ userId: tempUserId }, (findErr, updated) => {
-              if (findErr) return res.status(500).json({ error: "DB error retrieving updated preferences" });
-              return res.json(updated);
-            });
-          }
-        );
+        await preferences.save();
+        return res.json(preferences);
       } else {
-        // Create new
-        preferenceDoc.createdAt = new Date().toISOString();
-
-        userPreferences.insert(preferenceDoc, (insertErr, newPrefs) => {
-          if (insertErr) return res.status(500).json({ error: "DB error creating preferences" });
-          return res.status(201).json(newPrefs);
+        // Create new preferences
+        preferences = new UserPreferences({
+          userId: tempUserId,
+          categories: categories,
+          llmContext: llmContext
         });
+
+        await preferences.save();
+        return res.status(201).json(preferences);
       }
-    });
+    } catch (error) {
+      console.error("Error saving temp preferences:", error);
+      return res.status(500).json({ error: "DB error saving preferences" });
+    }
   }
 ];
 
 // DELETE temp preferences
-export const deleteTempPreferences = (req, res) => {
-  const tempUserId = "temp-user-001";
+export const deleteTempPreferences = async (req, res) => {
+  try {
+    const tempUserId = "temp-user-001";
 
-  userPreferences.remove({ userId: tempUserId }, { multi: false }, (err, numRemoved) => {
-    if (err) return res.status(500).json({ error: "DB error deleting preferences" });
-    if (numRemoved === 0) return res.status(404).json({ error: "No preferences found" });
+    const result = await UserPreferences.deleteOne({ userId: tempUserId });
+
+    if (result.deletedCount === 0) {
+      return res.status(404).json({ error: "No preferences found" });
+    }
 
     return res.json({ message: "Preferences deleted successfully" });
-  });
+  } catch (error) {
+    console.error("Error deleting temp preferences:", error);
+    return res.status(500).json({ error: "DB error deleting preferences" });
+  }
 };
 
 // ==================== AUTHENTICATED ROUTES (future use) ====================
 
 // GET authenticated preferences
-export const getAuthPreferences = (req, res) => {
-  const username = req.session.username;
+export const getAuthPreferences = async (req, res) => {
+  try {
+    const username = req.session.username;
 
-  userPreferences.findOne({ userId: username }, (err, prefs) => {
-    if (err) return res.status(500).json({ error: "DB error finding preferences" });
+    let prefs = await UserPreferences.findOne({ userId: username });
 
     if (!prefs) {
       return res.json({
@@ -147,67 +173,70 @@ export const getAuthPreferences = (req, res) => {
     }
 
     return res.json(prefs);
-  });
+  } catch (error) {
+    console.error("Error fetching auth preferences:", error);
+    return res.status(500).json({ error: "DB error finding preferences" });
+  }
 };
 
 // POST authenticated preferences
 export const saveAuthPreferences = [
   validatePreferences,
-  (req, res) => {
-    const username = req.session.username;
-    const data = matchedData(req);
-    const categories = data.categories || [];
+  async (req, res) => {
+    try {
+      const username = req.session.username;
+      const data = matchedData(req);
+      const categories = data.categories || [];
 
-    const llmContext = {
-      preferenceString: categories.join(', '),
-      categoryCount: categories.length,
-      prompt: `User interests: ${categories.length > 0 ? categories.join(', ') : 'None selected'}`
-    };
+      const llmContext = {
+        preferenceString: categories.join(', '),
+        categoryCount: categories.length,
+        prompt: `User interests: ${categories.length > 0 ? categories.join(', ') : 'None selected'}`
+      };
 
-    const preferenceDoc = {
-      userId: username,
-      categories: categories,
-      updatedAt: new Date().toISOString(),
-      llmContext: llmContext
-    };
+      // Find existing preferences or create new
+      let preferences = await UserPreferences.findOne({ userId: username });
 
-    userPreferences.findOne({ userId: username }, (err, existingPrefs) => {
-      if (err) return res.status(500).json({ error: "DB error finding preferences" });
+      if (preferences) {
+        // Update existing preferences
+        preferences.categories = categories;
+        preferences.llmContext = llmContext;
+        preferences.updatedAt = new Date();
 
-      if (existingPrefs) {
-        userPreferences.update(
-          { userId: username },
-          { $set: preferenceDoc },
-          {},
-          (updateErr) => {
-            if (updateErr) return res.status(500).json({ error: "DB error updating preferences" });
-
-            userPreferences.findOne({ userId: username }, (findErr, updated) => {
-              if (findErr) return res.status(500).json({ error: "DB error retrieving updated preferences" });
-              return res.json(updated);
-            });
-          }
-        );
+        await preferences.save();
+        return res.json(preferences);
       } else {
-        preferenceDoc.createdAt = new Date().toISOString();
-
-        userPreferences.insert(preferenceDoc, (insertErr, newPrefs) => {
-          if (insertErr) return res.status(500).json({ error: "DB error creating preferences" });
-          return res.status(201).json(newPrefs);
+        // Create new preferences
+        preferences = new UserPreferences({
+          userId: username,
+          categories: categories,
+          llmContext: llmContext
         });
+
+        await preferences.save();
+        return res.status(201).json(preferences);
       }
-    });
+    } catch (error) {
+      console.error("Error saving auth preferences:", error);
+      return res.status(500).json({ error: "DB error saving preferences" });
+    }
   }
 ];
 
 // DELETE authenticated preferences
-export const deleteAuthPreferences = (req, res) => {
-  const username = req.session.username;
+export const deleteAuthPreferences = async (req, res) => {
+  try {
+    const username = req.session.username;
 
-  userPreferences.remove({ userId: username }, { multi: false }, (err, numRemoved) => {
-    if (err) return res.status(500).json({ error: "DB error deleting preferences" });
-    if (numRemoved === 0) return res.status(404).json({ error: "Preferences not found" });
+    const result = await UserPreferences.deleteOne({ userId: username });
+
+    if (result.deletedCount === 0) {
+      return res.status(404).json({ error: "Preferences not found" });
+    }
 
     return res.json({ message: "Preferences deleted successfully" });
-  });
+  } catch (error) {
+    console.error("Error deleting auth preferences", error);
+    return res.status(500).json({ error: "DB error deleting preferences" });
+  }
 };
