@@ -19,7 +19,7 @@ const UserPreferencesSchema = new mongoose.Schema({
     categoryCount: Number,
     prompt: String
   },
-  createdAt: { 
+  createdAt: {
     type: Date, 
     default: Date.now 
   },
@@ -39,7 +39,6 @@ UserPreferencesSchema.pre('save', function(next) {
 const UserPreferences = mongoose.model("UserPreferences", UserPreferencesSchema);
 
 // ==================== VALIDATION ====================
-
 const validatePreferences = [
   body('categories')
     .isArray()
@@ -237,7 +236,7 @@ export const deleteAuthPreferences = async (req, res) => {
 
     return res.json({ message: "Preferences deleted successfully" });
   } catch (error) {
-    console.error("Error deleting auth preferences:", error);
+    console.error("Error deleting auth preferences", error);
     return res.status(500).json({ error: "DB error deleting preferences" });
   }
 };
