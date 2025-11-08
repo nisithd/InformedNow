@@ -10,7 +10,6 @@ import { genSalt, hash, compare } from "bcrypt";
 import { body, validationResult, matchedData } from 'express-validator';
 import mongoose from "mongoose";
 
-
 import { 
   getTempPreferences, 
   saveTempPreferences, 
