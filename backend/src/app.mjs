@@ -10,6 +10,15 @@ import { genSalt, hash, compare } from "bcrypt";
 import { body, validationResult, matchedData } from 'express-validator';
 import mongoose from "mongoose";
 
+import { 
+  getTempPreferences, 
+  saveTempPreferences, 
+  deleteTempPreferences,
+  getAuthPreferences,
+  saveAuthPreferences,
+  deleteAuthPreferences
+} from './UserPreferences.mjs';
+
 const PORT = 3000;
 const app = express();
 
@@ -271,6 +280,13 @@ app.get("/api/user/", (req, res) => {
   if (!req.session.username) return res.json(null);
   return res.json(req.session.username);
 });
+
+// ==================== USER PREFERENCES ROUTES ====================
+
+// Temporary routes (no authentication needed - for testing)
+app.get("/api/preferences/temp/", getTempPreferences);
+app.post("/api/preferences/temp/", saveTempPreferences);
+app.delete("/api/preferences/temp/", deleteTempPreferences);
 
 // ==================== GALLERY LIST ROUTES ====================
 
