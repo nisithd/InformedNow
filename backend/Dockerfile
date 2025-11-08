@@ -2,8 +2,10 @@ FROM node:24-slim
 
 RUN mkdir -p /home/app
 WORKDIR /home/app
+
+COPY ./package*.json ./
+COPY ./tsconfig.json ./
 COPY ./src ./src
-COPY tsconfig.json ./
 RUN npm install
 RUN npm run build
 
