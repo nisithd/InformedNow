@@ -8,7 +8,7 @@
   "scripts": {
     "build": "tsc",
     "start": "node dist/app.js",
-    "dev": "SET NODE_ENV=dev & nodemon --watch src --ext ts --exec ts-node src/app.ts",
+    "dev": "NODE_ENV=dev nodemon --watch src --ext ts --exec ts-node src/app.ts",
     "prod": "NODE_ENV=prod node dist/app.js",
     "test": "mocha -r ts-node/register src/**/*.test.ts"
   },

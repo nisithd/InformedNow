@@ -8,6 +8,7 @@ import { genSalt, hash, compare } from "bcrypt";
 import { body, validationResult, matchedData } from "express-validator";
 import fetch from "node-fetch";
 import type { LLMResponse, ErrorResponse } from "./types/api";
+import cors from "cors";
 
 import { preferencesRouter } from "./routes/UserPreferences";
 
@@ -26,6 +27,11 @@ const app = express();
 // ---------------------------
 app.set("trust proxy", 1);
 app.use(express.json());
+// CORS (only for testing locally)
+// app.use(cors({
+//   origin: "http://localhost:4000",
+//   credentials: true,
+// }));
 app.use(
   session({
     secret: SESSION_SECRET,
