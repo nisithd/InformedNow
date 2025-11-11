@@ -8,6 +8,7 @@ import { genSalt, hash, compare } from "bcrypt";
 import { body, validationResult, matchedData } from "express-validator";
 import fetch from "node-fetch";
 import type { LLMResponse, ErrorResponse } from "./types/api";
+import { fetchNews } from "./cron/newsFetch";
 import cors from "cors";
 
 import { preferencesRouter } from "./routes/UserPreferences";
@@ -50,7 +51,10 @@ app.use(express.urlencoded({ extended: false }));
 // ---------------------------
 mongoose
   .connect(mongoURI)
-  .then(() => console.log("✅ Connected to MongoDB"))
+  .then(() => {
+    console.log("✅ Connected to MongoDB")
+    fetchNews();
+    })
   .catch((err) => console.error("❌ Mongo connection failed:", err));
 
 // ---------------------------
