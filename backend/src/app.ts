@@ -1,3 +1,4 @@
+import { Article } from "./models/Article";
 import "dotenv/config";
 import express, { Request, Response, NextFunction } from "express";
 import session from "express-session";
@@ -29,10 +30,11 @@ const app = express();
 app.set("trust proxy", 1);
 app.use(express.json());
 // CORS (only for testing locally)
-// app.use(cors({
-//   origin: "http://localhost:4000",
-//   credentials: true,
-// }));
+app.use(cors({
+  origin: "http://localhost:4000",
+  credentials: true,
+}));
+
 app.use(
   session({
     secret: SESSION_SECRET,
@@ -98,6 +100,17 @@ app.post("/api/location", (req: Request, res: Response) => {
   const { latitude, longitude } = req.body;
   console.log("Received location:", latitude, longitude);
   res.json({ message: "Location received successfully!" });
+});
+
+// Get articles route
+app.get("/api/articles", async (req: Request, res: Response) => {
+  try {
+    const articles = await Article.find().sort({ published_at: -1 }).limit(20);
+    res.json(articles);
+  } catch (error) {
+    console.error("Error fetching articles:", error);
+    res.status(500).json({ error: "Failed to fetch articles" });
+  }
 });
 
 // ---------------------------

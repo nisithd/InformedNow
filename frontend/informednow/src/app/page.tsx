@@ -1,21 +1,34 @@
 'use client';
 import { useState, useEffect } from 'react';
 import UserPreferences from './components/UserPreferences';
-import { UserPreferencesData } from '@/types/UserPreferences';
+import NewsFeed from './components/NewsFeed';
+
+interface UserPreferencesData {
+  userId: string | null;
+  categories: string[];
+  createdAt: string;
+  updatedAt: string;
+  llmContext?: {
+    preferenceString: string;
+    categoryCount: number;
+    prompt: string;
+  };
+}
+
+type ViewType = 'landing' | 'preferences' | 'main';
 
 export default function Home() {
-  const [currentView, setCurrentView] = useState<'landing' | 'preferences' | 'main'>('landing');
+  const [currentView, setCurrentView] = useState<ViewType>('landing');
   const [userPreferences, setUserPreferences] = useState<UserPreferencesData | null>(null);
 
-  // Load saved preferences
+  // Check if user already has preferences saved
   useEffect(() => {
     const savedPreferences = localStorage.getItem('userPreferences');
     if (savedPreferences) {
       try {
-        const parsed: UserPreferencesData = JSON.parse(savedPreferences);
+        const parsed = JSON.parse(savedPreferences);
         setUserPreferences(parsed);
-
-        // If preferences exist, jump to main view
+        // If user has preferences, skip to main view
         if (parsed.categories && parsed.categories.length > 0) {
           setCurrentView('main');
         }
@@ -25,11 +38,11 @@ export default function Home() {
     }
   }, []);
 
-  const handleSignUpClick = () => {
+  const handleSignUpClick = (): void => {
     setCurrentView('preferences');
   };
 
-  const handlePreferencesComplete = (preferences: UserPreferencesData) => {
+  const handlePreferencesComplete = (preferences: UserPreferencesData): void => {
     setUserPreferences(preferences);
     setCurrentView('main');
   };
@@ -37,11 +50,16 @@ export default function Home() {
   // Landing View
   if (currentView === 'landing') {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-600 to-purple-700 flex items-center justify-center p-4">
-        <div className="text-center max-w-3xl">
-          <h1 className="text-6xl font-bold text-white mb-6">InformedNow</h1>
-          <p className="text-2xl text-blue-100 mb-4">Clear, Relevant, Unbiased News</p>
-          <p className="text-lg text-blue-200 mb-12">
+      <div className="min-h-screen bg-gradient-to-br from-blue-600 to-purple-700">
+        {/* Hero Section */}
+        <div className="text-center pt-16 pb-8 px-4">
+          <h1 className="text-6xl font-bold text-white mb-6">
+            InformedNow
+          </h1>
+          <p className="text-2xl text-blue-100 mb-4">
+            Clear, Relevant, Unbiased News
+          </p>
+          <p className="text-lg text-blue-200 mb-8">
             Aggregated from multiple sources, summarized by AI, and personalized for you.
           </p>
           <button
@@ -50,6 +68,11 @@ export default function Home() {
           >
             Get Started
           </button>
+        </div>
+
+        {/* News Feed */}
+        <div className="py-8">
+          <NewsFeed />
         </div>
       </div>
     );
@@ -65,7 +88,7 @@ export default function Home() {
     return (
       <div className="min-h-screen bg-gray-50">
         {/* Header */}
-        <header className="bg-white shadow-sm border-b">
+        <header className="bg-white shadow-sm border-b sticky top-0 z-10">
           <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
             <h1 className="text-2xl font-bold text-blue-600">InformedNow</h1>
             <button
@@ -77,29 +100,9 @@ export default function Home() {
           </div>
         </header>
 
-        {/* Main Content */}
-        <main className="max-w-7xl mx-auto px-4 py-8">
-          <div className="bg-white rounded-xl shadow-md p-8 text-center">
-            <h2 className="text-3xl font-bold text-gray-900 mb-4">Welcome to InformedNow!</h2>
-            <p className="text-gray-600 mb-6">Your personalized news feed based on your interests:</p>
-
-            {userPreferences?.categories && (
-              <div className="flex flex-wrap gap-2 justify-center mb-6">
-                {userPreferences.categories.map((category) => (
-                  <span
-                    key={category}
-                    className="px-4 py-2 bg-blue-100 text-blue-700 rounded-full text-sm font-medium"
-                  >
-                    {category}
-                  </span>
-                ))}
-              </div>
-            )}
-
-            <p className="text-gray-500 text-sm">
-              News feed coming soon! (Backend integration in progress)
-            </p>
-          </div>
+        {/* News Feed */}
+        <main className="py-8">
+          <NewsFeed />
         </main>
       </div>
     );
