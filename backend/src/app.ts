@@ -4,7 +4,6 @@ import express, { Request, Response, NextFunction } from "express";
 import session from "express-session";
 import {createServer} from "http";
 import mongoose from "mongoose";
-import fetch from "node-fetch";
 import type { LLMResponse, ErrorResponse } from "./types/api";
 import { fetchNews } from "./cron/newsFetch";
 import cors from "cors";
