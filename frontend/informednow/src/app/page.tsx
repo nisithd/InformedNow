@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import UserPreferences from './components/UserPreferences';
 import NewsFeed from './components/NewsFeed';
+import HistoricalContextSelection from "./components/HistoricalContextSelection";
 
 interface UserPreferencesData {
   userId: string | null;
@@ -69,7 +70,7 @@ export default function Home() {
             Get Started
           </button>
         </div>
-
+        <HistoricalContextSelection/>
         {/* News Feed */}
         <div className="py-8">
           <NewsFeed />
@@ -99,7 +100,6 @@ export default function Home() {
             </button>
           </div>
         </header>
-
         {/* News Feed */}
         <main className="py-8">
           <NewsFeed />
