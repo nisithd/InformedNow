@@ -110,7 +110,14 @@ app.get("/api/testLLM", async (_req: Request, res: Response) => {
 });
 
 app.post("/api/addHistoricalContext/", async (req: Request, res: Response): Promise<void> => {
-    const context: string = "give historical context of this in < 3 sentence: " + req.body.data;
+    const context: string = "give historical context of this text in < 3 sentence: " + req.body.data;
+
+    const response = await callLLM(context);
+    res.json(response);
+});
+
+app.post("/api/summarizeArticle/", async (req: Request, res: Response): Promise<void> => {
+    const context: string = "summarize this article text in < 6 sentence: " + req.body.data;
 
     const response = await callLLM(context);
     res.json(response);
