@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import HistoricalContextSelection from "./HistoricalContextSelection";
 
 interface Article {
   _id: string;
@@ -17,10 +18,43 @@ const NewsFeed: React.FC = () => {
   const [articles, setArticles] = useState<Article[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-
+  const [articleSummaries, setArticleSummaries] = useState<{ [key: string]: string }>({});
+  const [selectedText, setSelectedText] = useState<string>('');
+  const [summaryVisibility, setSummaryVisibility] = useState<{ [key: string]: boolean }>({});
   useEffect(() => {
     fetchArticles();
   }, []);
+
+  const handleGetSummary = async (articleId: string, title:String, desc:String) => {
+            setLoading(true);
+            setError(null);
+            try {
+                const info = title + " " + desc;
+                const response = await fetch('/api/summarizeArticle/', {
+                    method: "POST",
+                    headers: {"Content-Type": "application/json"},
+                    body: JSON.stringify({"data": info}),
+                });
+                const data = await response.json();
+                const llmResponse = data.candidates[0]?.content?.parts[0]?.text;
+                setArticleSummaries((prevSummaries) => ({
+                 ...prevSummaries,
+                [articleId]: llmResponse || 'No summary available'
+      }));
+            } catch
+                (err) {
+                setError('Failed to fetch historical context');
+            } finally {
+                setLoading(false);
+            }
+        };
+
+  const toggleSummaryVisibility = (articleId: string) => {
+    setSummaryVisibility(prevState => ({
+      ...prevState,
+      [articleId]: !prevState[articleId]
+    }));
+  };
 
   const fetchArticles = async (): Promise<void> => {
     try {
@@ -38,6 +72,11 @@ const NewsFeed: React.FC = () => {
 
       const data: Article[] = await response.json();
       console.log('Loaded articles:', data);
+      const initialVisibility: { [key: string]: boolean } = {};
+      data.forEach(article => {
+        initialVisibility[article._id] = true; // Show summaries by default
+      });
+      setSummaryVisibility(initialVisibility);
       setArticles(data);
       setLoading(false);
     } catch (err) {
@@ -166,7 +205,7 @@ const NewsFeed: React.FC = () => {
               e.currentTarget.style.transform = 'translateX(0)';
               e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.1)';
             }}
-            onClick={() => window.open(article.url, '_blank')}
+            onClick={() => console.log("url temp removed")}
           >
             {/* Number Badge */}
             <div style={{
@@ -260,7 +299,7 @@ const NewsFeed: React.FC = () => {
                 WebkitLineClamp: 2,
                 WebkitBoxOrient: 'vertical',
                 overflow: 'hidden'
-              }}>
+              }} onClick={() =>window.open(article.url, '_blank')}>
                 {article.title}
               </h3>
 
@@ -271,16 +310,50 @@ const NewsFeed: React.FC = () => {
                   color: '#666',
                   lineHeight: '1.5',
                   display: '-webkit-box',
-                  WebkitLineClamp: 2,
                   WebkitBoxOrient: 'vertical',
-                  overflow: 'hidden'
+                  overflowY: 'auto'
                 }}>
-                  {article.description}
+                  <HistoricalContextSelection desc={article.description ?? ""} />
                 </p>
               )}
             </div>
+            <button onClick={() => handleGetSummary(article._id,article.title, article.description ?? "ignore description")} disabled={loading} style={{
+                  padding: '8px 16px',
+                  backgroundColor: '#f1f1f1',
+                  color: '#333',
+                  border: '1px solid #ddd',
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  marginTop: '10px'
+            }}> Get summary </button>
+
+            {summaryVisibility[article._id] && articleSummaries[article._id] && (
+            <p style={{marginTop: '12px',
+                  padding: '12px',
+                  backgroundColor: '#f8f8f8',
+                  borderRadius: '8px',
+                  fontSize: '14px',
+                  color: '#333',
+                  whiteSpace: 'pre-wrap',
+                  wordWrap: 'break-word',
+                  border: '1px solid #ddd',
+                  overflowY: 'auto'}}> {articleSummaries[article._id]}</p>)}
+            <button
+                onClick={() => toggleSummaryVisibility(article._id)}
+                style={{
+                  padding: '8px 16px',
+                  backgroundColor: '#f1f1f1',
+                  color: '#333',
+                  border: '1px solid #ddd',
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  marginTop: '10px'
+                }}
+              >
+                {summaryVisibility[article._id] ? 'Hide Summary' : 'Show Summary'}
+              </button>
           </article>
-        ))}
+        ))} x
       </div>
     </div>
   );
