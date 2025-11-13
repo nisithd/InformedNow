@@ -299,7 +299,7 @@ const NewsFeed: React.FC = () => {
                 WebkitLineClamp: 2,
                 WebkitBoxOrient: 'vertical',
                 overflow: 'hidden'
-              }}>
+              }} onClick={() =>window.open(article.url, '_blank')}>
                 {article.title}
               </h3>
 
