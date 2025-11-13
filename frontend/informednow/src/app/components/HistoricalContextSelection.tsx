@@ -1,7 +1,10 @@
 'use client';
 import React, {useState} from 'react';
 
-export default function HistoricalContextSelection() {
+interface HistoricalContextSelectionProps {
+  desc: string;
+}
+export default function HistoricalContextSelection({desc}: HistoricalContextSelectionProps) {
     const [selectedText, setSelectedText] = useState<string>('');
     const [responseData, setResponseData] = useState<any>(null);
     const [loading, setLoading] = useState<boolean>(false);
@@ -47,21 +50,15 @@ export default function HistoricalContextSelection() {
             <div
                 onMouseUp={handleMouseUp}
             >
-                <p> This is sample text that you can select here</p>
+                <p> {desc}</p>
 
             </div>
-            {selectedText && (
-                <div>
-                    <h3>Selected Text:</h3>
-                    <p>{selectedText}</p>
-                </div>
-            )}
             <button onClick={handleButtonClick} disabled={loading}>
                 Get Historical Context!
             </button>
             {responseData && (
                 <div>
-                    <h3>Response Text:</h3>
+                    <h3>Context:</h3>
                     <p>{responseData}</p>
                 </div>
             )}

@@ -70,7 +70,6 @@ export default function Home() {
             Get Started
           </button>
         </div>
-        <HistoricalContextSelection/>
         {/* News Feed */}
         <div className="py-8">
           <NewsFeed />
