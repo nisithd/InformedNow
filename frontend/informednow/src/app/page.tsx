@@ -1,8 +1,9 @@
 'use client';
 import { useState, useEffect } from 'react';
+import { useAuth } from './components/AuthContext';
+import { useRouter } from 'next/navigation';
 import UserPreferences from './components/UserPreferences';
 import NewsFeed from './components/NewsFeed';
-import HistoricalContextSelection from "./components/HistoricalContextSelection";
 
 interface UserPreferencesData {
   userId: string | null;
@@ -19,28 +20,57 @@ interface UserPreferencesData {
 type ViewType = 'landing' | 'preferences' | 'main';
 
 export default function Home() {
+  const { user, loading } = useAuth();
+  const router = useRouter();
   const [currentView, setCurrentView] = useState<ViewType>('landing');
   const [userPreferences, setUserPreferences] = useState<UserPreferencesData | null>(null);
+  const [checkingPreferences, setCheckingPreferences] = useState(true);
 
-  // Check if user already has preferences saved
+  // Check user preferences when authenticated
   useEffect(() => {
-    const savedPreferences = localStorage.getItem('userPreferences');
-    if (savedPreferences) {
+    const checkUserPreferences = async () => {
+      if (!user) {
+        setCheckingPreferences(false);
+        return;
+      }
+
       try {
-        const parsed = JSON.parse(savedPreferences);
-        setUserPreferences(parsed);
-        // If user has preferences, skip to main view
-        if (parsed.categories && parsed.categories.length > 0) {
-          setCurrentView('main');
+        // Fetch authenticated user's preferences
+        const response = await fetch('/api/preferences/auth');
+        if (response.ok) {
+          const data = await response.json();
+          setUserPreferences(data);
+          
+          // If user has preferences, go to main view
+          if (data.categories && data.categories.length > 0) {
+            setCurrentView('main');
+          } else {
+            // User is logged in but has no preferences set
+            setCurrentView('preferences');
+          }
+        } else {
+          // No preferences found, show preferences page
+          setCurrentView('preferences');
         }
       } catch (error) {
         console.error('Error loading preferences:', error);
+        setCurrentView('preferences');
+      } finally {
+        setCheckingPreferences(false);
       }
+    };
+
+    if (!loading) {
+      checkUserPreferences();
     }
-  }, []);
+  }, [user, loading]);
 
   const handleSignUpClick = (): void => {
-    setCurrentView('preferences');
+    router.push('/signup');
+  };
+
+  const handleSignInClick = (): void => {
+    router.push('/signin');
   };
 
   const handlePreferencesComplete = (preferences: UserPreferencesData): void => {
@@ -48,8 +78,20 @@ export default function Home() {
     setCurrentView('main');
   };
 
-  // Landing View
-  if (currentView === 'landing') {
+  // Show loading state while checking auth
+  if (loading || checkingPreferences) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Landing View - Only for non-authenticated users
+  if (!user && currentView === 'landing') {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-600 to-purple-700">
         {/* Hero Section */}
@@ -63,34 +105,63 @@ export default function Home() {
           <p className="text-lg text-blue-200 mb-8">
             Aggregated from multiple sources, summarized by AI, and personalized for you.
           </p>
-          <button
-            onClick={handleSignUpClick}
-            className="px-8 py-4 bg-white text-blue-600 rounded-xl font-bold text-lg hover:bg-blue-50 transition-all shadow-xl hover:shadow-2xl hover:scale-105"
-          >
-            Get Started
-          </button>
+          <div className="flex gap-4 justify-center">
+            <button
+              onClick={handleSignUpClick}
+              className="px-8 py-4 bg-white text-blue-600 rounded-xl font-bold text-lg hover:bg-blue-50 transition-all shadow-xl hover:shadow-2xl hover:scale-105"
+            >
+              Get Started
+            </button>
+            <button
+              onClick={handleSignInClick}
+              className="px-8 py-4 bg-transparent border-2 border-white text-white rounded-xl font-bold text-lg hover:bg-white hover:text-blue-600 transition-all shadow-xl"
+            >
+              Sign In
+            </button>
+          </div>
         </div>
-        {/* News Feed */}
-        <div className="py-8">
-          <NewsFeed />
+        {/* Features Section */}
+        <div className="py-8 px-4">
+          <div className="max-w-4xl mx-auto">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-center">
+              <div className="bg-white bg-opacity-10 backdrop-blur-lg rounded-xl p-6">
+                <div className="text-4xl mb-4">🎯</div>
+                <h3 className="text-xl font-bold text-white mb-2">Personalized</h3>
+                <p className="text-blue-100">News tailored to your interests and preferences</p>
+              </div>
+              <div className="bg-white bg-opacity-10 backdrop-blur-lg rounded-xl p-6">
+                <div className="text-4xl mb-4">🤖</div>
+                <h3 className="text-xl font-bold text-white mb-2">AI-Powered</h3>
+                <p className="text-blue-100">Summaries and context generated by advanced AI</p>
+              </div>
+              <div className="bg-white bg-opacity-10 backdrop-blur-lg rounded-xl p-6">
+                <div className="text-4xl mb-4">🌐</div>
+                <h3 className="text-xl font-bold text-white mb-2">Unbiased</h3>
+                <p className="text-blue-100">Multiple sources aggregated for balanced coverage</p>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     );
   }
 
-  // Preferences View
-  if (currentView === 'preferences') {
+  // Preferences View - For authenticated users without preferences
+  if (user && currentView === 'preferences') {
     return <UserPreferences onComplete={handlePreferencesComplete} />;
   }
 
-  // Main News Feed View
-  if (currentView === 'main') {
+  // Main News Feed View - For authenticated users with preferences
+  if (user && currentView === 'main') {
     return (
       <div className="min-h-screen bg-gray-50">
         {/* Header */}
         <header className="bg-white shadow-sm border-b sticky top-0 z-10">
           <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
-            <h1 className="text-2xl font-bold text-blue-600">InformedNow</h1>
+            <div>
+              <h1 className="text-2xl font-bold text-blue-600">InformedNow</h1>
+              <p className="text-sm text-gray-600">Welcome back, {user.username}!</p>
+            </div>
             <button
               onClick={() => setCurrentView('preferences')}
               className="px-4 py-2 text-sm bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors"

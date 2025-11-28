@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useAuth } from './AuthContext';
 
 interface Category {
   id: string;
@@ -24,7 +25,6 @@ interface UserPreferencesProps {
   onComplete?: (preferences: UserPreferencesData) => void;
 }
 
-// Mock categories - ready for backend integration
 const NEWS_CATEGORIES: Category[] = [
   { id: 'world', label: 'World News', icon: '🌍' },
   { id: 'politics', label: 'Politics', icon: '🏛️' },
@@ -47,14 +47,17 @@ const NEWS_CATEGORIES: Category[] = [
 ];
 
 const UserPreferences: React.FC<UserPreferencesProps> = ({ onComplete }) => {
+  const { user } = useAuth();
   const [selectedPreferences, setSelectedPreferences] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
   // Load preferences from API on mount
   useEffect(() => {
     console.log('🔍 Fetching preferences from API...');
-    // TEMPORARY: Use /api/preferences/temp/ for testing without auth
-    fetch('/api/preferences/temp/', {
+    
+    const endpoint = user ? '/api/preferences/auth' : '/api/preferences/temp';
+    
+    fetch(endpoint, {
       method: 'GET',
       credentials: 'include'
     })
@@ -69,19 +72,8 @@ const UserPreferences: React.FC<UserPreferencesProps> = ({ onComplete }) => {
     })
     .catch(error => {
       console.error('API Error:', error);
-      console.log('Using local preferences fallback');
-      // Fallback to localStorage if API fails
-      const savedPreferences = localStorage.getItem('userPreferences');
-      if (savedPreferences) {
-        try {
-          const parsed = JSON.parse(savedPreferences);
-          setSelectedPreferences(parsed.categories || []);
-        } catch (parseError) {
-          console.error('Error loading local preferences:', parseError);
-        }
-      }
     });
-  }, []);
+  }, [user]);
 
   const togglePreference = (categoryId: string): void => {
     setSelectedPreferences(prev => {
@@ -98,14 +90,14 @@ const UserPreferences: React.FC<UserPreferencesProps> = ({ onComplete }) => {
     
     console.log('💾 Saving preferences to API...', selectedPreferences);
     
-    // Structure ready for MongoDB schema
     const userPreferencesData = {
       categories: selectedPreferences,
-      // LLM context is built on backend
     };
 
-    // TEMPORARY: Save to /api/preferences/temp/ for testing without auth
-    fetch('/api/preferences/temp/', {
+    // Use authenticated endpoint if user is logged in
+    const endpoint = user ? '/api/preferences/auth' : '/api/preferences/temp';
+    
+    fetch(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
@@ -120,10 +112,6 @@ const UserPreferences: React.FC<UserPreferencesProps> = ({ onComplete }) => {
       setIsSubmitting(false);
       console.log('Saved to database:', data);
       
-      // Also save to localStorage as backup
-      localStorage.setItem('userPreferences', JSON.stringify(data));
-      
-      // Call onComplete callback if provided
       if (onComplete) {
         onComplete(data);
       }
@@ -131,20 +119,7 @@ const UserPreferences: React.FC<UserPreferencesProps> = ({ onComplete }) => {
     .catch(error => {
       console.error('Error saving preferences:', error);
       setIsSubmitting(false);
-      
-      // Fallback: save to localStorage only
-      const localData = {
-        userId: null,
-        categories: selectedPreferences,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        offline: true
-      };
-      localStorage.setItem('userPreferences', JSON.stringify(localData));
-      
-      if (onComplete) {
-        onComplete(localData);
-      }
+      alert('Failed to save preferences. Please try again.');
     });
   };
 
@@ -153,8 +128,9 @@ const UserPreferences: React.FC<UserPreferencesProps> = ({ onComplete }) => {
       categories: []
     };
     
-    // TEMPORARY: Try to save empty preferences to temp API
-    fetch('/api/preferences/temp/', {
+    const endpoint = user ? '/api/preferences/auth' : '/api/preferences/temp';
+    
+    fetch(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
@@ -162,22 +138,20 @@ const UserPreferences: React.FC<UserPreferencesProps> = ({ onComplete }) => {
     })
     .then(response => response.json())
     .then((data: UserPreferencesData) => {
-      localStorage.setItem('userPreferences', JSON.stringify(data));
       if (onComplete) {
         onComplete(data);
       }
     })
     .catch(error => {
-      console.log('Skipping with local storage:', error);
-      const localData = {
-        userId: null,
-        categories: [],
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        skipped: true
-      };
-      localStorage.setItem('userPreferences', JSON.stringify(localData));
+      console.log('Skip error:', error);
       if (onComplete) {
+        const localData = {
+          userId: null,
+          categories: [],
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          skipped: true
+        };
         onComplete(localData);
       }
     });
@@ -215,7 +189,7 @@ const UserPreferences: React.FC<UserPreferencesProps> = ({ onComplete }) => {
             lineHeight: '1.6',
             marginBottom: '20px'
           }}>
-            Select topics you'd like to see in your news feed. You can always change these later in settings.
+            Select topics you'd like to see in your news feed. You can always change these later.
           </p>
           <div style={{
             fontSize: '16px',
