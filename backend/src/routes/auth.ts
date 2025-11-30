@@ -1,6 +1,7 @@
 import { Router, Request, Response } from "express";
 import { body, validationResult } from "express-validator";
 import { User } from "../models/User";
+import { sendWelcomeNewsletter } from "../utils/sendWelcomeNewsletter";
 
 export const authRouter = Router();
 
@@ -20,6 +21,10 @@ const validateSignup = [
   body("password")
     .isLength({ min: 6 })
     .withMessage("Password must be at least 6 characters"),
+  body("newsletterOptIn")
+    .optional()
+    .isBoolean()
+    .withMessage("Newsletter opt-in must be a boolean"),
 ];
 
 const validateSignin = [
@@ -36,7 +41,7 @@ authRouter.post("/signup", validateSignup, async (req: Request, res: Response) =
     return res.status(400).json({ errors: errors.array() });
   }
 
-  const { username, email, password } = req.body;
+  const { username, email, password, newsletterOptIn } = req.body;
 
   try {
     // Check if user already exists
@@ -56,11 +61,20 @@ authRouter.post("/signup", validateSignup, async (req: Request, res: Response) =
       username,
       email,
       password,
+      newsletterOptIn: newsletterOptIn || false,
     });
 
     // Set session
     req.session.username = newUser.username;
     req.session.userId = (newUser._id as any).toString();
+
+    // Send welcome newsletter if opted in
+    if (newsletterOptIn) {
+      // Don't await - send in background
+      sendWelcomeNewsletter(newUser)
+        .then(() => console.log(`✅ Welcome newsletter sent to ${email}`))
+        .catch(err => console.error(`❌ Failed to send welcome newsletter to ${email}:`, err));
+    }
 
     return res.status(201).json({
       message: "User created successfully",
