@@ -75,15 +75,10 @@ const NewsFeed: React.FC = () => {
 
       const data: Article[] = await response.json();
       
-      // Auto-fetch summaries for all articles
-      data.forEach(article => {
-        handleGetSummary(article._id, article.title, article.description ?? "");
-      });
-      
-      // Initialize all cards as expanded
+      // Initialize all cards as collapsed by default to save space
       const initialExpanded: { [key: string]: boolean } = {};
       data.forEach(article => {
-        initialExpanded[article._id] = true;
+        initialExpanded[article._id] = false;
       });
       setExpandedCards(initialExpanded);
       
@@ -210,12 +205,23 @@ const NewsFeed: React.FC = () => {
                   </div>
                 )}
 
-                {/* AI Summary */}
+                {/* AI Summary Section */}
                 {expandedCards[article._id] && (
                   <div className="mt-4 p-4 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg border border-blue-200">
-                    <div className="flex items-center gap-2 mb-2">
+                    <div className="flex items-center gap-2 mb-3">
                       <span className="text-sm font-semibold text-blue-700">🤖 AI Summary</span>
+                      
+                      {/* Get Summary Button - Only show if summary doesn't exist */}
+                      {!articleSummaries[article._id] && !summaryLoading[article._id] && (
+                        <button
+                          onClick={() => handleGetSummary(article._id, article.title, article.description ?? "")}
+                          className="ml-auto px-3 py-1 bg-blue-600 text-white text-xs rounded-md hover:bg-blue-700 transition-colors font-medium"
+                        >
+                          Generate Summary
+                        </button>
+                      )}
                     </div>
+                    
                     {summaryLoading[article._id] ? (
                       <div className="flex items-center gap-2 text-gray-600">
                         <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
@@ -226,28 +232,47 @@ const NewsFeed: React.FC = () => {
                         {articleSummaries[article._id]}
                       </div>
                     ) : (
-                      <div className="text-gray-500 text-sm">Summary not available</div>
+                      <div className="text-gray-500 text-sm">
+                        Click "Generate Summary" to get an AI-powered summary of this article.
+                      </div>
                     )}
                   </div>
                 )}
 
                 {/* Expand/Collapse Button */}
-                <button
-                  onClick={() => toggleCardExpansion(article._id)}
-                  className="mt-4 flex items-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-800 transition-colors"
-                >
-                  {expandedCards[article._id] ? (
-                    <>
-                      <span>▲</span>
-                      <span>Show Less</span>
-                    </>
-                  ) : (
-                    <>
-                      <span>▼</span>
-                      <span>Show More</span>
-                    </>
+                <div className="flex justify-between items-center mt-4">
+                  <button
+                    onClick={() => toggleCardExpansion(article._id)}
+                    className="flex items-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-800 transition-colors"
+                  >
+                    {expandedCards[article._id] ? (
+                      <>
+                        <span>▲</span>
+                        <span>Show Less</span>
+                      </>
+                    ) : (
+                      <>
+                        <span>▼</span>
+                        <span>Show More</span>
+                      </>
+                    )}
+                  </button>
+                  
+                  {/* Quick Generate Summary Button (visible when collapsed) */}
+                  {!expandedCards[article._id] && !articleSummaries[article._id] && (
+                    <button
+                      onClick={() => {
+                        toggleCardExpansion(article._id);
+                        setTimeout(() => {
+                          handleGetSummary(article._id, article.title, article.description ?? "");
+                        }, 100);
+                      }}
+                      className="px-3 py-1 bg-blue-600 text-white text-xs rounded-md hover:bg-blue-700 transition-colors font-medium"
+                    >
+                      Quick Summary
+                    </button>
                   )}
-                </button>
+                </div>
               </div>
             </div>
           </article>
