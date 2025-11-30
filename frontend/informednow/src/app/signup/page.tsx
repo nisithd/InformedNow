@@ -10,14 +10,18 @@ export default function SignUp() {
     email: "",
     password: "",
     confirmPassword: "",
+    newsletterOptIn: false,
   });
   const [errors, setErrors] = useState<any>({});
   const [loading, setLoading] = useState(false);
   const [serverError, setServerError] = useState("");
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+    const { name, value, type, checked } = e.target;
+    setFormData((prev) => ({ 
+      ...prev, 
+      [name]: type === 'checkbox' ? checked : value 
+    }));
     if (errors[name]) {
       setErrors((prev: any) => ({ ...prev, [name]: "" }));
     }
@@ -75,6 +79,7 @@ export default function SignUp() {
           username: formData.username,
           email: formData.email,
           password: formData.password,
+          newsletterOptIn: formData.newsletterOptIn,
         }),
       });
 
@@ -198,6 +203,28 @@ export default function SignUp() {
               {errors.confirmPassword && (
                 <p className="mt-1 text-sm text-red-600">{errors.confirmPassword}</p>
               )}
+            </div>
+          </div>
+
+          {/* Newsletter Opt-in */}
+          <div className="flex items-start">
+            <div className="flex items-center h-5">
+              <input
+                id="newsletterOptIn"
+                name="newsletterOptIn"
+                type="checkbox"
+                checked={formData.newsletterOptIn}
+                onChange={handleChange}
+                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded cursor-pointer"
+              />
+            </div>
+            <div className="ml-3 text-sm">
+              <label htmlFor="newsletterOptIn" className="font-medium text-gray-700 cursor-pointer">
+                Send me weekly newsletters
+              </label>
+              <p className="text-gray-500">
+                Get top headlines personalized to your interests, delivered every week. You'll receive your first newsletter immediately after signing up!
+              </p>
             </div>
           </div>
 

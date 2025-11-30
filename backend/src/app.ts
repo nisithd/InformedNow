@@ -6,6 +6,8 @@ import { createServer } from "http";
 import mongoose from "mongoose";
 import type { LLMResponse, ErrorResponse } from "./types/api";
 import { fetchNews } from "./cron/newsFetch";
+import { startWeeklyNewsletter } from "./cron/weeklyNewsletter";
+import { verifyEmailConfig } from "./utils/emailService";
 import cors from "cors";
 import MongoStore from "connect-mongo";
 
@@ -69,7 +71,20 @@ mongoose
   .connect(mongoURI)
   .then(() => {
     console.log("Connected to MongoDB");
-    fetchNews();
+    
+    // Verify email configuration
+    verifyEmailConfig()
+      .then(isValid => {
+        if (!isValid) {
+          console.warn('⚠️  Email service not properly configured. Newsletters will not be sent.');
+          console.warn('📧 Please check your EMAIL_USER and EMAIL_PASSWORD in .env file');
+          console.warn('💡 For Gmail: Generate an App Password at https://myaccount.google.com/apppasswords');
+        }
+      });
+    
+    // Start cron jobs
+    fetchNews(); // Fetch news articles
+    startWeeklyNewsletter(); // Weekly newsletter job
   })
   .catch((err) => console.error("Mongo connection failed:", err));
 

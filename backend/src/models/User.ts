@@ -5,6 +5,8 @@ export interface IUser extends Document {
   username: string;
   email: string;
   password: string;
+  newsletterOptIn: boolean;
+  lastNewsletterSent?: Date;
   createdAt: Date;
   updatedAt: Date;
   comparePassword(candidatePassword: string): Promise<boolean>;
@@ -32,6 +34,13 @@ const UserSchema = new Schema<IUser>(
       type: String,
       required: true,
       minlength: 6,
+    },
+    newsletterOptIn: {
+      type: Boolean,
+      default: false,
+    },
+    lastNewsletterSent: {
+      type: Date,
     },
   },
   {
