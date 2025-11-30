@@ -40,7 +40,7 @@ app.use(
   session({
     secret: SESSION_SECRET,
     resave: false,
-    saveUninitialized: false, // Changed to false for better security
+    saveUninitialized: false,
     store: MongoStore.create({
       mongoUrl: mongoURI,
       collectionName: "sessions",
@@ -82,29 +82,63 @@ const SomeSchema = new mongoose.Schema({
 });
 const SomeModel = mongoose.model("SomeModel", SomeSchema);
 
-async function callLLM(query: String) {
-  const response = await fetch(
-    "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent",
-    {
-      method: "POST",
-      headers: { 
-        "Content-Type": "application/json", 
-        "x-goog-api-key": GEMINI_API_KEY 
-      },
-      body: JSON.stringify({
-        contents: [
-          {
+// ---------------------------
+// LLM call function
+// ---------------------------
+async function callLLM(query: string) {
+  try {
+    console.log("Calling Gemini API with query:", query.substring(0, 100) + "...");
+    
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`,
+      {
+        method: "POST",
+        headers: { 
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          contents: [
+            {
+              parts: [
+                {
+                  text: query,
+                },
+              ],
+            },
+          ],
+          generationConfig: {
+            temperature: 0.7,
+            maxOutputTokens: 1024,
+          }
+        }),
+      }
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("Gemini API error:", response.status, errorText);
+      throw new Error(`Gemini API error: ${response.status} - ${errorText}`);
+    }
+
+    const data = await response.json();
+    console.log("Gemini API response received successfully");
+    return data;
+  } catch (error) {
+    console.error("Error calling LLM:", error);
+    return {
+      candidates: [
+        {
+          content: {
             parts: [
               {
-                text: `${query}`,
-              },
-            ],
-          },
-        ],
-      }),
-    }
-  );
-  return await response.json();
+                text: "Failed to generate response. Please check your API key and try again."
+              }
+            ]
+          }
+        }
+      ]
+    };
+  }
 }
 
 // ---------------------------
@@ -130,15 +164,37 @@ app.get("/api/testLLM", async (_req: Request, res: Response) => {
 });
 
 app.post("/api/addHistoricalContext/", async (req: Request, res: Response): Promise<void> => {
-  const context: string = "give historical context of this text in < 3 sentence: " + req.body.data;
-  const response = await callLLM(context);
-  res.json(response);
+  try {
+    const userText = req.body.data;
+    if (!userText || userText.trim().length === 0) {
+      res.status(400).json({ error: "No text provided" });
+      return;
+    }
+
+    const context: string = `Provide historical context for the following text in 3 sentences or less. Be concise and informative:\n\n"${userText}"`;
+    const response = await callLLM(context);
+    res.json(response);
+  } catch (error) {
+    console.error("Error in addHistoricalContext:", error);
+    res.status(500).json({ error: "Failed to generate historical context" });
+  }
 });
 
 app.post("/api/summarizeArticle/", async (req: Request, res: Response): Promise<void> => {
-  const context: string = "summarize this article text in < 6 sentence: " + req.body.data;
-  const response = await callLLM(context);
-  res.json(response);
+  try {
+    const articleText = req.body.data;
+    if (!articleText || articleText.trim().length === 0) {
+      res.status(400).json({ error: "No article text provided" });
+      return;
+    }
+
+    const context: string = `Summarize the following article in 6 sentences or less. Focus on the key points and main takeaways:\n\n"${articleText}"`;
+    const response = await callLLM(context);
+    res.json(response);
+  } catch (error) {
+    console.error("Error in summarizeArticle:", error);
+    res.status(500).json({ error: "Failed to generate summary" });
+  }
 });
 
 // ---------------------------
