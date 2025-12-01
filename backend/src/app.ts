@@ -1,8 +1,8 @@
-import { Article } from "./models/Article";
+import {Article} from "./models/Article";
 import "dotenv/config";
-import express, { Request, Response, NextFunction } from "express";
+import express, {Request, Response, NextFunction} from "express";
 import session from "express-session";
-import { createServer } from "http";
+import {createServer} from "http";
 import mongoose from "mongoose";
 import type { LLMResponse } from "./types/api";
 import { fetchNews } from "./cron/newsFetch";
@@ -15,8 +15,9 @@ import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 import { body, validationResult } from "express-validator";
 
-import { preferencesRouter } from "./routes/UserPreferences";
-import { authRouter } from "./routes/auth";
+import {preferencesRouter} from "./routes/UserPreferences";
+import {authRouter} from "./routes/auth";
+import {ArticleLocationNames} from "./types/articleLocationNames";
 
 // ---------------------------
 // Environment + constants
@@ -127,7 +128,6 @@ app.use(
     },
     name: "sessionId",
   })
-);
 
 // Initialize passport AFTER session middleware
 app.use(passport.initialize());
@@ -136,16 +136,6 @@ app.use(passport.session());
 app.use((req: Request, _res: Response, next): void => {
   console.log("HTTP request", req.method, req.url, req.body || req.query);
   next();
-});
-
-// ---------------------------
-// MongoDB connection
-// ---------------------------
-mongoose
-  .connect(mongoURI)
-  .then(() => {
-    console.log("Connected to MongoDB");
-
     verifyEmailConfig().then((isValid) => {
       if (!isValid) {
         console.warn("⚠️  Email service not properly configured. Newsletters will not be sent.");
@@ -241,22 +231,22 @@ const validateLLMInput = [
 // Routes
 // ---------------------------
 app.get("/api/testLLM", async (_req: Request, res: Response) => {
-  try {
-    const llmRes = await fetch("http://localgpt:11434/api/generate/", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: "llama3.2",
-        prompt: "what is the capital of canada",
-        stream: false,
-      }),
-    });
-    const data = (await llmRes.json()) as LLMResponse;
-    res.json(data.response);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Failed to call LLM API" });
-  }
+    try {
+        const llmRes = await fetch("http://localgpt:11434/api/generate/", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({
+                model: "llama3.2",
+                prompt: "what is the capital of canada",
+                stream: false,
+            }),
+        });
+        const data = (await llmRes.json()) as LLMResponse;
+        res.json(data.response);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({error: "Failed to call LLM API"});
+    }
 });
 
 app.post(
@@ -349,6 +339,29 @@ app.get("/api/articles", async (req: Request, res: Response) => {
   }
 });
 
+// Interactive Globe map data route
+app.get("/api/article/locationNames", async (req: Request, res: Response) => {
+    try {
+        const pageNum = req.query.page as string | undefined;
+        const page = parseInt(pageNum ?? "0");
+        const limit =  10;
+        const articles = await Article.find().sort({published_at: -1}).skip(limit*page).limit(10);
+
+        const locationNames: ArticleLocationNames[] = [];
+        articles.some((article) => {
+            locationNames.push({
+                articleTitle: article.title,
+                articleLocation: article.country,
+            });
+            return false;
+        });
+
+        res.json({"locations": locationNames});
+    } catch (error) {
+        console.error("Error fetching articles:", error);
+        res.status(500).json({error: "Failed to fetch articles"});
+    }
+});
 // ---------------------------
 // Error handler
 // ---------------------------

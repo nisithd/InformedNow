@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import HistoricalContextSelection from "./HistoricalContextSelection";
 import DOMPurify from "dompurify";
+import InteractiveGlobe from "./InteractiveGlobe";
 
 interface Article {
   _id: string;
@@ -17,6 +18,7 @@ interface Article {
 
 const NewsFeed: React.FC = () => {
   const [articles, setArticles] = useState<Article[]>([]);
+  const [noMoreArticles, setNoMoreArticles] = useState(false);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [articleSummaries, setArticleSummaries] = useState<{ [key: string]: string }>({});
@@ -26,7 +28,7 @@ const NewsFeed: React.FC = () => {
   const articlesPerPage = 10;
 
   useEffect(() => {
-    fetchArticles();
+    fetchArticles(currentPage);
   }, []);
 
   const sanitizeHTML = (html: string): string => {
@@ -94,12 +96,24 @@ const NewsFeed: React.FC = () => {
     }));
   };
 
-  const fetchArticles = async (): Promise<void> => {
+  const fetchArticles = async (skip = 0): Promise<void> => {
     try {
       setLoading(true);
-      const response = await fetch("/api/articles", {
-        method: "GET",
-        credentials: "include",
+      const prefRes = await fetch('/api/preferences/auth', {
+        method: 'GET',
+        credentials: 'include'
+      });
+
+      const prefs = await prefRes.json();
+
+      console.log(prefs.categories);
+      console.log("skip", skip);
+      
+      const response = await fetch('/api/articles', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prefs: prefs.categories, skip }),
       });
 
       if (!response.ok) {
@@ -108,13 +122,21 @@ const NewsFeed: React.FC = () => {
 
       const data: Article[] = await response.json();
 
+      if (data.length === 0) {
+        console.log("No more articles available");
+        setNoMoreArticles(true);
+        setLoading(false);
+        return;
+      }
+      
+      // Initialize all cards as collapsed by default to save space
       const initialExpanded: { [key: string]: boolean } = {};
       data.forEach((article) => {
         initialExpanded[article._id] = false;
       });
       setExpandedCards(initialExpanded);
-
-      setArticles(data);
+      
+      setArticles(prev => [...prev, ...data]);
       setLoading(false);
     } catch (err) {
       console.error("Error fetching articles:", err);
@@ -126,9 +148,25 @@ const NewsFeed: React.FC = () => {
   const indexOfLastArticle = currentPage * articlesPerPage;
   const indexOfFirstArticle = indexOfLastArticle - articlesPerPage;
   const currentArticles = articles.slice(indexOfFirstArticle, indexOfLastArticle);
-  const totalPages = Math.ceil(articles.length / articlesPerPage);
+  let totalPages = Math.ceil(articles.length / articlesPerPage);
 
-  const handlePageChange = (pageNumber: number) => {
+  const handlePageChange = async (pageNumber: number) => {
+    totalPages = Math.ceil(articles.length / articlesPerPage);
+    const needed = pageNumber * articlesPerPage;
+
+    console.log("new page", pageNumber);
+    console.log("total pages", totalPages);
+    console.log("current page", currentPage);
+    console.log("pages needed", needed);
+    console.log("no more articles", noMoreArticles);
+
+    // If user is requesting a page that's beyond what we have, fetch more
+    if (needed > articles.length) {
+      if (noMoreArticles) return;
+
+      await fetchArticles(totalPages);
+    }
+
     setCurrentPage(pageNumber);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
@@ -158,7 +196,10 @@ const NewsFeed: React.FC = () => {
       <div className="max-w-2xl mx-auto mt-20 p-8 bg-red-50 border border-red-200 rounded-lg">
         <h3 className="text-xl font-semibold text-red-800 mb-2">⚠️ Error Loading Articles</h3>
         <p className="text-red-600 mb-4">{error}</p>
-        <button onClick={fetchArticles} className="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors">
+        <button
+          onClick={async() => fetchArticles(0)}
+          className="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+        >
           Try Again
         </button>
       </div>
@@ -184,8 +225,17 @@ const NewsFeed: React.FC = () => {
       </div>
 
       <div className="space-y-6">
-        {currentArticles.map((article) => (
-          <article key={article._id} className="bg-white rounded-xl shadow-md hover:shadow-lg transition-shadow duration-200 overflow-hidden border border-gray-200">
+        {currentPage > totalPages && noMoreArticles && 
+        <div className="flex justify-center mt-6">
+          <p className="text-gray-600 font-semibold text-lg text-center">
+            No more articles available.
+          </p>
+        </div>}
+        {currentArticles.map((article, index) => (
+          <article
+            key={article._id}
+            className="bg-white rounded-xl shadow-md hover:shadow-lg transition-shadow duration-200 overflow-hidden border border-gray-200"
+          >
             <div className="flex flex-col lg:flex-row">
               {article.image_url && isValidURL(article.image_url) && (
                 <div className="lg:w-80 h-64 lg:h-auto flex-shrink-0">
@@ -298,19 +348,34 @@ const NewsFeed: React.FC = () => {
             ← Previous
           </button>
 
-          <div className="flex gap-2">
-            {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => (
-              <button key={pageNum} onClick={() => handlePageChange(pageNum)} className={`px-4 py-2 rounded-lg transition-colors ${currentPage === pageNum ? "bg-blue-600 text-white" : "bg-white border border-gray-300 text-gray-700 hover:bg-gray-50"}`}>
-                {pageNum}
-              </button>
-            ))}
+          <div className="flex items-center gap-2">
+            <span>Page</span>
+            <input
+              type="number"
+              min={1}
+              max={totalPages}
+              value={currentPage}
+              onChange={(e) => {
+                const page = Number(e.target.value);
+                if (page >= 1 && page <= totalPages) {
+                  handlePageChange(page);
+                }
+              }}
+              className="w-16 px-2 py-1 border border-gray-300 rounded-lg text-center"
+            />
+            <span>of {totalPages}</span>
           </div>
 
-          <button onClick={() => handlePageChange(currentPage + 1)} disabled={currentPage === totalPages} className="px-4 py-2 rounded-lg bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+          <button
+            onClick={() => handlePageChange(currentPage + 1)}
+            disabled={currentPage == totalPages && noMoreArticles}
+            className="px-4 py-2 rounded-lg bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
             Next →
           </button>
         </div>
       )}
+      <InteractiveGlobe page={currentPage}/>
     </div>
   );
 };

@@ -35,15 +35,10 @@ const NEWS_CATEGORIES: Category[] = [
   { id: 'sports', label: 'Sports', icon: '⚽' },
   { id: 'entertainment', label: 'Entertainment', icon: '🎬' },
   { id: 'gaming', label: 'Gaming', icon: '🎮' },
-  { id: 'music', label: 'Music', icon: '🎵' },
   { id: 'food', label: 'Food & Cooking', icon: '🍳' },
-  { id: 'travel', label: 'Travel', icon: '✈️' },
-  { id: 'lifestyle', label: 'Lifestyle', icon: '✨' },
-  { id: 'fashion', label: 'Fashion', icon: '👗' },
+  { id: 'tourism', label: 'Travel & Tourism', icon: '✈️' },
   { id: 'environment', label: 'Environment', icon: '🌱' },
-  { id: 'education', label: 'Education', icon: '📚' },
   { id: 'crime', label: 'Crime', icon: '🚔' },
-  { id: 'weather', label: 'Weather', icon: '🌤️' }
 ];
 
 const UserPreferences: React.FC<UserPreferencesProps> = ({ onComplete }) => {
