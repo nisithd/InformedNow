@@ -186,7 +186,7 @@ const NewsFeed: React.FC = () => {
 
       {/* Articles List */}
       <div className="space-y-6">
-        {noMoreArticles && 
+        {currentPage > totalPages && noMoreArticles && 
         <div className="flex justify-center mt-6">
           <p className="text-gray-600 font-semibold text-lg text-center">
             No more articles available.
