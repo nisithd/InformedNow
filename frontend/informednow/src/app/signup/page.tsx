@@ -18,42 +18,20 @@ export default function SignUp() {
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type, checked } = e.target;
-    setFormData((prev) => ({ 
-      ...prev, 
-      [name]: type === 'checkbox' ? checked : value 
+    setFormData((prev) => ({
+      ...prev,
+      [name]: type === "checkbox" ? checked : value,
     }));
-    if (errors[name]) {
-      setErrors((prev: any) => ({ ...prev, [name]: "" }));
-    }
   };
 
   const validate = () => {
     const newErrors: any = {};
-
-    if (!formData.username.trim()) {
-      newErrors.username = "Username is required";
-    } else if (formData.username.length < 3) {
-      newErrors.username = "Username must be at least 3 characters";
-    } else if (!/^[a-zA-Z0-9_]+$/.test(formData.username)) {
-      newErrors.username = "Username can only contain letters, numbers, and underscores";
-    }
-
-    if (!formData.email.trim()) {
-      newErrors.email = "Email is required";
-    } else if (!/^\S+@\S+\.\S+$/.test(formData.email)) {
-      newErrors.email = "Please enter a valid email";
-    }
-
-    if (!formData.password) {
-      newErrors.password = "Password is required";
-    } else if (formData.password.length < 6) {
-      newErrors.password = "Password must be at least 6 characters";
-    }
-
+    if (!formData.username.trim()) newErrors.username = "Username is required";
+    if (!formData.email.trim()) newErrors.email = "Email is required";
+    if (!formData.password) newErrors.password = "Password is required";
     if (formData.password !== formData.confirmPassword) {
       newErrors.confirmPassword = "Passwords do not match";
     }
-
     return newErrors;
   };
 
@@ -81,37 +59,31 @@ export default function SignUp() {
           password: formData.password,
           newsletterOptIn: formData.newsletterOptIn,
         }),
+        credentials: "include",
       });
 
       const data = await response.json();
 
       if (response.ok) {
-        // Redirect to home, which will show preferences setup
         window.location.href = "/";
       } else {
-        if (data.field) {
-          setErrors({ [data.field]: data.error });
-        } else {
-          setServerError(data.error || "Something went wrong");
-        }
+        setServerError(data.error || "Signup failed");
       }
     } catch (error) {
-      setServerError("Network error. Please try again.");
+      setServerError("Network error. Please check if backend is running.");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen flex items-center justify-center bg-white py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
         <div>
-          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-            Create your account
-          </h2>
-          <p className="mt-2 text-center text-sm text-gray-600">
+          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">Create your account</h2>
+          <p className="mt-2 text-center text-sm text-gray-900">
             Already have an account?{" "}
-            <a href="/signin" className="font-medium text-blue-600 hover:text-blue-500">
+            <a href="/signin" className="font-medium text-blue-700 hover:text-blue-600">
               Sign in
             </a>
           </p>
@@ -119,120 +91,100 @@ export default function SignUp() {
 
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
           {serverError && (
-            <div className="rounded-md bg-red-50 p-4">
+            <div className="rounded-md bg-red-100 p-4">
               <div className="text-sm text-red-800">{serverError}</div>
             </div>
           )}
 
-          <div className="rounded-md shadow-sm space-y-4">
+          <div className="space-y-4">
             <div>
-              <label htmlFor="username" className="block text-sm font-medium text-gray-700">
+              <label htmlFor="username" className="block text-sm font-medium text-gray-900">
                 Username
               </label>
               <input
                 id="username"
                 name="username"
                 type="text"
-                autoComplete="username"
                 required
                 value={formData.username}
                 onChange={handleChange}
-                className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm"
-                placeholder="Username"
+                className="mt-1 block w-full px-3 py-2 border border-gray-400 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-gray-900"
               />
-              {errors.username && (
-                <p className="mt-1 text-sm text-red-600">{errors.username}</p>
-              )}
+              {errors.username && <p className="text-red-700 text-sm">{errors.username}</p>}
             </div>
 
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+              <label htmlFor="email" className="block text-sm font-medium text-gray-900">
                 Email address
               </label>
               <input
                 id="email"
                 name="email"
                 type="email"
-                autoComplete="email"
                 required
                 value={formData.email}
                 onChange={handleChange}
-                className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm"
-                placeholder="Email address"
+                className="mt-1 block w-full px-3 py-2 border border-gray-400 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-gray-900"
               />
-              {errors.email && (
-                <p className="mt-1 text-sm text-red-600">{errors.email}</p>
-              )}
+              {errors.email && <p className="text-red-700 text-sm">{errors.email}</p>}
             </div>
 
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700">
+              <label htmlFor="password" className="block text-sm font-medium text-gray-900">
                 Password
               </label>
               <input
                 id="password"
                 name="password"
                 type="password"
-                autoComplete="new-password"
                 required
                 value={formData.password}
                 onChange={handleChange}
-                className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm"
-                placeholder="Password"
+                className="mt-1 block w-full px-3 py-2 border border-gray-400 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-gray-900"
               />
-              {errors.password && (
-                <p className="mt-1 text-sm text-red-600">{errors.password}</p>
-              )}
+              {errors.password && <p className="text-red-700 text-sm">{errors.password}</p>}
             </div>
 
             <div>
-              <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700">
+              <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-900">
                 Confirm Password
               </label>
               <input
                 id="confirmPassword"
                 name="confirmPassword"
                 type="password"
-                autoComplete="new-password"
                 required
                 value={formData.confirmPassword}
                 onChange={handleChange}
-                className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm"
-                placeholder="Confirm password"
+                className="mt-1 block w-full px-3 py-2 border border-gray-400 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-gray-900"
               />
-              {errors.confirmPassword && (
-                <p className="mt-1 text-sm text-red-600">{errors.confirmPassword}</p>
-              )}
+              {errors.confirmPassword && <p className="text-red-700 text-sm">{errors.confirmPassword}</p>}
             </div>
           </div>
 
-          {/* Newsletter Opt-in */}
-          <div className="flex items-start">
-            <div className="flex items-center h-5">
-              <input
-                id="newsletterOptIn"
-                name="newsletterOptIn"
-                type="checkbox"
-                checked={formData.newsletterOptIn}
-                onChange={handleChange}
-                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded cursor-pointer"
-              />
-            </div>
-            <div className="ml-3 text-sm">
-              <label htmlFor="newsletterOptIn" className="font-medium text-gray-700 cursor-pointer">
-                Send me weekly newsletters
-              </label>
-              <p className="text-gray-500">
-                Get top headlines personalized to your interests, delivered every week. You'll receive your first newsletter immediately after signing up!
+          <div className="flex items-center">
+            <input
+              id="newsletterOptIn"
+              name="newsletterOptIn"
+              type="checkbox"
+              checked={formData.newsletterOptIn}
+              onChange={handleChange}
+              className="h-4 w-4 text-blue-700 focus:ring-blue-500 border-gray-400 rounded"
+            />
+            <label htmlFor="newsletterOptIn" className="ml-2 block text-sm text-gray-900">
+              Send me weekly newsletters
+              <p className="text-gray-800 text-xs">
+                Get top headlines personalized to your interests, delivered every week. You'll receive your first newsletter
+                immediately after signing up!
               </p>
-            </div>
+            </label>
           </div>
 
           <div>
             <button
               type="submit"
               disabled={loading}
-              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full flex justify-center py-2 px-4 text-sm font-medium rounded-md text-white bg-blue-700 hover:bg-blue-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-600 disabled:opacity-50"
             >
               {loading ? "Creating account..." : "Sign up"}
             </button>

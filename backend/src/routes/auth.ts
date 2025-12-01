@@ -3,99 +3,91 @@ import { body, validationResult } from "express-validator";
 import { User } from "../models/User";
 import { sendWelcomeNewsletter } from "../utils/sendWelcomeNewsletter";
 import passport from "../config/passport";
+import { securityLogger } from "../middleware/authMiddleware";
 
 export const authRouter = Router();
 
 const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:3001";
 
-// ==================== VALIDATION MIDDLEWARE ====================
 const validateSignup = [
   body("username")
     .trim()
     .isLength({ min: 3, max: 30 })
     .withMessage("Username must be 3-30 characters")
     .matches(/^[a-zA-Z0-9_]+$/)
-    .withMessage("Username can only contain letters, numbers, and underscores"),
-  body("email")
-    .trim()
-    .isEmail()
-    .withMessage("Must be a valid email")
-    .normalizeEmail(),
-  body("password")
-    .isLength({ min: 6 })
-    .withMessage("Password must be at least 6 characters"),
-  body("newsletterOptIn")
-    .optional()
-    .isBoolean()
-    .withMessage("Newsletter opt-in must be a boolean"),
+    .withMessage("Username can only contain letters, numbers, and underscores")
+    .customSanitizer((value) => {
+      return value.replace(/[^a-zA-Z0-9_]/g, "");
+    }),
+  body("email").trim().isEmail().withMessage("Must be a valid email").normalizeEmail().isLength({ max: 254 }).withMessage("Email too long"),
+  body("password").isLength({ min: 3, max: 128 }).withMessage("Password must be 3-128 characters"),
+  body("newsletterOptIn").optional().isBoolean().withMessage("Newsletter opt-in must be a boolean").toBoolean(),
 ];
 
 const validateSignin = [
-  body("username").trim().notEmpty().withMessage("Username is required"),
-  body("password").notEmpty().withMessage("Password is required"),
+  body("username").trim().notEmpty().withMessage("Username is required").isLength({ max: 30 }),
+  body("password").notEmpty().withMessage("Password is required").isLength({ max: 128 }),
 ];
 
-// ==================== GITHUB OAUTH ROUTES ====================
-
-// Initiate GitHub OAuth
+// GitHub OAuth
 authRouter.get("/github", passport.authenticate("github", { scope: ["user:email"] }));
 
-// GitHub OAuth callback
 authRouter.get(
   "/github/callback",
   passport.authenticate("github", { failureRedirect: `${FRONTEND_URL}/signin?error=oauth_failed` }),
   (req: Request, res: Response) => {
-    // Set session manually to match your existing session format
     const user = req.user as any;
     req.session.username = user.username;
     req.session.userId = user._id.toString();
-
-    // Redirect to frontend
-    res.redirect(`${FRONTEND_URL}/?oauth=success`);
+    req.session.save((err) => {
+      if (err) {
+        console.error("Session save error:", err);
+        return res.redirect(`${FRONTEND_URL}/signin?error=session_error`);
+      }
+      res.redirect(`${FRONTEND_URL}/?oauth=success`);
+    });
   }
 );
 
-// ==================== TRADITIONAL AUTH ROUTES ====================
-
 // Sign Up
-authRouter.post("/signup", validateSignup, async (req: Request, res: Response) => {
+authRouter.post("/signup", securityLogger, validateSignup, async (req: Request, res: Response) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
     return res.status(400).json({ errors: errors.array() });
   }
 
+  // Use sanitized body (middleware already sanitized req.body)
   const { username, email, password, newsletterOptIn } = req.body;
 
+  const sanitizedUsername = String(username).toLowerCase().trim();
+  const sanitizedEmail = String(email).toLowerCase().trim();
+
   try {
-    // Check if user already exists
     const existingUser = await User.findOne({
-      $or: [{ username }, { email }],
+      $or: [{ username: sanitizedUsername }, { email: sanitizedEmail }],
     });
 
     if (existingUser) {
       return res.status(409).json({
         error: "User already exists",
-        field: existingUser.username === username ? "username" : "email",
+        field: existingUser.username === sanitizedUsername ? "username" : "email",
       });
     }
 
-    // Create new user
     const newUser = await User.create({
-      username,
-      email,
-      password,
-      newsletterOptIn: newsletterOptIn || false,
+      username: sanitizedUsername,
+      email: sanitizedEmail,
+      password: password,
+      newsletterOptIn: Boolean(newsletterOptIn),
     });
 
-    // Set session
     req.session.username = newUser.username;
     req.session.userId = (newUser._id as any).toString();
 
-    // Send welcome newsletter if opted in
     if (newsletterOptIn) {
       sendWelcomeNewsletter(newUser)
-        .then(() => console.log(`✅ Welcome newsletter sent to ${email}`))
-        .catch(err => console.error(`❌ Failed to send welcome newsletter to ${email}:`, err));
+        .then(() => console.log(`✅ Welcome newsletter sent to ${sanitizedEmail}`))
+        .catch((err) => console.error(`❌ Failed to send welcome newsletter to ${sanitizedEmail}:`, err));
     }
 
     return res.status(201).json({
@@ -113,37 +105,34 @@ authRouter.post("/signup", validateSignup, async (req: Request, res: Response) =
 });
 
 // Sign In
-authRouter.post("/signin", validateSignin, async (req: Request, res: Response) => {
+authRouter.post("/signin", securityLogger, validateSignin, async (req: Request, res: Response) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
     return res.status(400).json({ errors: errors.array() });
   }
 
   const { username, password } = req.body;
+  const sanitizedUsername = String(username).toLowerCase().trim();
 
   try {
-    // Find user
-    const user = await User.findOne({ username });
+    const user = await User.findOne({ username: sanitizedUsername });
 
     if (!user) {
       return res.status(401).json({ error: "Invalid credentials" });
     }
 
-    // Check if user has a password (OAuth users might not)
     if (!user.password) {
-      return res.status(401).json({ 
-        error: "This account uses GitHub sign-in. Please sign in with GitHub." 
+      return res.status(401).json({
+        error: "This account uses GitHub sign-in. Please sign in with GitHub.",
       });
     }
 
-    // Check password
     const isMatch = await user.comparePassword(password);
 
     if (!isMatch) {
       return res.status(401).json({ error: "Invalid credentials" });
     }
 
-    // Set session
     req.session.username = user.username;
     req.session.userId = (user._id as any).toString();
 
@@ -162,9 +151,10 @@ authRouter.post("/signin", validateSignin, async (req: Request, res: Response) =
 });
 
 // Sign Out
-authRouter.post("/signout", (req: Request, res: Response) => {
+authRouter.post("/signout", securityLogger, (req: Request, res: Response) => {
   req.session.destroy((err) => {
     if (err) {
+      console.error("Signout error:", err);
       return res.status(500).json({ error: "Error signing out" });
     }
     res.clearCookie("connect.sid");
@@ -194,8 +184,9 @@ authRouter.get("/me", async (req: Request, res: Response) => {
 
   try {
     const user = await User.findById(req.session.userId).select("-password");
-    
+
     if (!user) {
+      req.session.destroy(() => {});
       return res.status(404).json({ error: "User not found" });
     }
 
