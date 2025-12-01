@@ -7,6 +7,7 @@ export interface IArticle extends Document {
   image_url?: string;
   country: string[];
   language: string;
+  categories?: string;
   source_id?: string;
   published_at?: string;
   fetchedAt: Date;
@@ -19,6 +20,7 @@ const ArticleSchema: Schema = new Schema({
   image_url: String,
   country: [String],
   language: String,
+  categories: { type: [String], default: [] },
   source_id: String,
   published_at: String,
   fetchedAt: { type: Date, default: Date.now },
