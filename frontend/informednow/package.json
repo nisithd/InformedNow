@@ -9,6 +9,7 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "jerrypick": "^1.1.2",
     "lucide-react": "^0.460.0",
     "next": "16.0.0",
     "react": "19.2.0",
