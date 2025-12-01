@@ -182,6 +182,7 @@ const GlobeComponent: React.FC<GlobeComponentProps>= ({page}) => {
                     />
                 </div>
             )}
+            <a href="https://www.openstreetmap.org/copyright">Map data from © OpenStreetMap</a>
         </div>
     );
 }
