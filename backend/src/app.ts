@@ -34,10 +34,10 @@ app.set("trust proxy", 1);
 app.use(express.json());
 
 // CORS (only for testing locally)
-// app.use(cors({
-//   origin: "http://localhost:4000",
-//   credentials: true,
-// }));
+app.use(cors({
+  origin: "http://localhost:4000",
+  credentials: true,
+}));
 
 app.use(
   session({
@@ -232,9 +232,15 @@ app.post("/api/location", (req: Request, res: Response) => {
 });
 
 // Get articles route
-app.get("/api/articles", async (req: Request, res: Response) => {
+app.post("/api/articles", async (req: Request, res: Response) => {
+  const { prefs, skip = 0 } = req.body;
+  const offset = (skip - 1) * 20;
+
+  console.log("skip", skip);
+  console.log("offset", offset);
+
   try {
-    const articles = await Article.find().sort({ published_at: -1 }).limit(20);
+    const articles = await Article.find({ categories: { $in: prefs }}).sort({ published_at: -1 }).skip(offset).limit(20);
     res.json(articles);
   } catch (error) {
     console.error("Error fetching articles:", error);
