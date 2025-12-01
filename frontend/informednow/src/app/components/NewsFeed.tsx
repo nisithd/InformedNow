@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import HistoricalContextSelection from "./HistoricalContextSelection";
+import InteractiveGlobe from "./InteractiveGlobe";
 
 interface Article {
   _id: string;
@@ -359,6 +360,7 @@ const NewsFeed: React.FC = () => {
           </button>
         </div>
       )}
+      <InteractiveGlobe page={currentPage}/>
     </div>
   );
 };
