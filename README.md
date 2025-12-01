@@ -55,6 +55,7 @@ Here are the third-party APIs used in your InformedNow project as dot points:
 ## Deployment
 
 > Explain how you have deployed your application.
+> 
 For our deployment setup, we are using a docker compose configuration. We use jwilder/nginx-proxy to act as an automated reverse proxy between clients and our server. It forwards requests to either the acme-companion for SSL certificates or the frontend-proxy which forwards requests to the frontend, backend, or localgpt docker containers. 
 
 ## Challenges
