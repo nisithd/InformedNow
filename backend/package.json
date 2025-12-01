@@ -30,6 +30,8 @@
     "node-cron": "^4.2.1",
     "node-fetch": "^3.3.2",
     "nodemailer": "^7.0.11",
+    "passport": "^0.7.0",
+    "passport-github2": "^0.1.12",
     "passport-google-oauth20": "^2.0.0",
     "zod": "^4.1.12"
   },
@@ -43,6 +45,8 @@
     "@types/express-session": "^1.18.2",
     "@types/node": "^24.10.0",
     "@types/nodemailer": "^7.0.4",
+    "@types/passport": "^1.0.17",
+    "@types/passport-github2": "^1.2.9",
     "chai": "^5.1.1",
     "mocha": "^11.0.1",
     "nodemon": "^3.1.10",

@@ -10,6 +10,7 @@ import { startWeeklyNewsletter } from "./cron/weeklyNewsletter";
 import { verifyEmailConfig } from "./utils/emailService";
 import cors from "cors";
 import MongoStore from "connect-mongo";
+import passport from "./config/passport"; // ADDED: Import passport config
 
 import { preferencesRouter } from "./routes/UserPreferences";
 import { authRouter } from "./routes/auth";
@@ -56,6 +57,10 @@ app.use(
     },
   })
 );
+
+// ADDED: Initialize passport AFTER session middleware
+app.use(passport.initialize());
+app.use(passport.session());
 
 app.use(express.urlencoded({ extended: false }));
 
@@ -176,7 +181,7 @@ app.get("/api/testLLM", async (_req: Request, res: Response) => {
   }
 });
 
-app.post("/api/addHistoricalContext/", async (req: Request, res: Response): Promise<void> => {
+app.post("/api/addHistoricalContext", async (req: Request, res: Response): Promise<void> => {
   try {
     const userText = req.body.data;
     if (!userText || userText.trim().length === 0) {
@@ -193,7 +198,7 @@ app.post("/api/addHistoricalContext/", async (req: Request, res: Response): Prom
   }
 });
 
-app.post("/api/summarizeArticle/", async (req: Request, res: Response): Promise<void> => {
+app.post("/api/summarizeArticle", async (req: Request, res: Response): Promise<void> => {
   try {
     const articleText = req.body.data;
     if (!articleText || articleText.trim().length === 0) {
@@ -211,7 +216,7 @@ app.post("/api/summarizeArticle/", async (req: Request, res: Response): Promise<
 });
 
 // ---------------------------
-// Auth routes
+// Auth routes (includes GitHub OAuth)
 // ---------------------------
 app.use("/api/auth", authRouter);
 

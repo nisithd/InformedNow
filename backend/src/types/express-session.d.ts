@@ -1,4 +1,5 @@
 import "express-session";
+import { IUser } from "../models/User";
 
 declare module "express-session" {
   interface SessionData {
@@ -6,3 +7,11 @@ declare module "express-session" {
     userId?: string;
   }
 }
+
+declare global {
+  namespace Express {
+    interface User extends IUser {}
+  }
+}
+
+export {};

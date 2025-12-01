@@ -2,8 +2,11 @@ import { Router, Request, Response } from "express";
 import { body, validationResult } from "express-validator";
 import { User } from "../models/User";
 import { sendWelcomeNewsletter } from "../utils/sendWelcomeNewsletter";
+import passport from "../config/passport";
 
 export const authRouter = Router();
+
+const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:3001";
 
 // ==================== VALIDATION MIDDLEWARE ====================
 const validateSignup = [
@@ -32,7 +35,27 @@ const validateSignin = [
   body("password").notEmpty().withMessage("Password is required"),
 ];
 
-// ==================== ROUTES ====================
+// ==================== GITHUB OAUTH ROUTES ====================
+
+// Initiate GitHub OAuth
+authRouter.get("/github", passport.authenticate("github", { scope: ["user:email"] }));
+
+// GitHub OAuth callback
+authRouter.get(
+  "/github/callback",
+  passport.authenticate("github", { failureRedirect: `${FRONTEND_URL}/signin?error=oauth_failed` }),
+  (req: Request, res: Response) => {
+    // Set session manually to match your existing session format
+    const user = req.user as any;
+    req.session.username = user.username;
+    req.session.userId = user._id.toString();
+
+    // Redirect to frontend
+    res.redirect(`${FRONTEND_URL}/?oauth=success`);
+  }
+);
+
+// ==================== TRADITIONAL AUTH ROUTES ====================
 
 // Sign Up
 authRouter.post("/signup", validateSignup, async (req: Request, res: Response) => {
@@ -70,7 +93,6 @@ authRouter.post("/signup", validateSignup, async (req: Request, res: Response) =
 
     // Send welcome newsletter if opted in
     if (newsletterOptIn) {
-      // Don't await - send in background
       sendWelcomeNewsletter(newUser)
         .then(() => console.log(`✅ Welcome newsletter sent to ${email}`))
         .catch(err => console.error(`❌ Failed to send welcome newsletter to ${email}:`, err));
@@ -105,6 +127,13 @@ authRouter.post("/signin", validateSignin, async (req: Request, res: Response) =
 
     if (!user) {
       return res.status(401).json({ error: "Invalid credentials" });
+    }
+
+    // Check if user has a password (OAuth users might not)
+    if (!user.password) {
+      return res.status(401).json({ 
+        error: "This account uses GitHub sign-in. Please sign in with GitHub." 
+      });
     }
 
     // Check password
@@ -174,6 +203,8 @@ authRouter.get("/me", async (req: Request, res: Response) => {
       id: (user._id as any).toString(),
       username: user.username,
       email: user.email,
+      avatarUrl: user.avatarUrl,
+      githubUsername: user.githubUsername,
       createdAt: user.createdAt,
     });
   } catch (error) {
