@@ -14,7 +14,7 @@ https://project-informednow.amazingcloud.space/
 
 > Provide a detailed description of your app
 > 
-Our app is a centralized platform where users can access the latest news article headlines, along with getting AI based summaries of the articles and historical context. The app fetches over 1000 articles per day, from numerous sources in over 100 countries. Users can define their interests when first signing up, and at any point afterwards. These preferences are used to personalize the feed and find articles that align with the user’s interests. Additionally users can view an interactive globe where some of the latest headlines for many countries will appear.
+Our app is a centralized platform where users can access the latest news article headlines, along with getting AI based summaries of the articles and historical context. To use the historical context feature, users can select part of the text that makes up the article description. The AI summaries are generated based off the description as well. The app fetches over 1000 articles per day, from numerous sources in over 100 countries. Users can define their interests when first signing up, and at any point afterwards. These preferences are used to personalize the feed and find articles that align with the user’s interests. Additionally users can view an interactive globe where some of the latest headlines for many countries will appear.
 
 ## Development
 
