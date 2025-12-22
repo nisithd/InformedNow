@@ -25,10 +25,7 @@ import {ArticleLocationNames} from "./types/articleLocationNames";
 const PORT = process.env.PORT ? parseInt(process.env.PORT) : 3000;
 const NODE_ENV = process.env.NODE_ENV ?? "dev";
 const SESSION_SECRET = process.env.SESSION_SECRET || "fallback_secret";
-const mongoURI =
-  process.env.NODE_ENV === "prod"
-    ? "mongodb://mongo:27017/databaseName"
-    : "mongodb://localhost:27017/testdb";
+const mongoURI = process.env.MONGODB_URI || "mongodb://localhost:27017/testdb";
 const GEMINI_API_KEY: string = process.env.GEMINI_API_KEY || "empty key";
 const app = express();
 
